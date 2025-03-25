@@ -1,3 +1,5 @@
+
+
 {
   "expo": {
     "name": "MyApp",
@@ -14,8 +16,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "bundleIdentifier": "com.foreign.app", // Aquí pones el que quieras usar
-      "client-id":"497729458678-oovq36fgcgdm6ho6unb5rql4gg30cupn.apps.googleusercontent.com",
+      "bundleIdentifier": "com.foreign.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true
     },
     "android": {

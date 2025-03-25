@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,10 @@ import {
   ScrollView,
   Alert,
   SafeAreaView,
+  ActivityIndicator
 } from 'react-native';
 import MapView, { Marker, LatLng } from 'react-native-maps';
-import { GooglePlacesService } from '../services/googlePlacesService'; // Asegúrate de tener este servicio implementado
+import { GooglePlacesService } from '../services/googlePlacesService';
 
 type MarkerData = {
   id: string;
@@ -20,100 +21,227 @@ type MarkerData = {
   name: string;
   address?: string;
   category?: string;
-  pinColor?: string; // Agregamos la propiedad pinColor para cada marcador
+  pinColor?: string;
+  timestamp?: number; // Add timestamp for cache expiration
+};
+
+type CacheData = {
+  markers: MarkerData[];
+  timestamp: number;
 };
 
 const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
+const CACHE_EXPIRY_TIME = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 export default function MapScreen() {
   const [markers, setMarkers] = useState<MarkerData[]>([]);
   const [favoriteMarkers, setFavoriteMarkers] = useState<MarkerData[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [pendingTypes, setPendingTypes] = useState<string[]>([]);
+  const [confirmedTypes, setConfirmedTypes] = useState<string[]>([]);
   const [isAddingPlace, setIsAddingPlace] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [manualMarkerCoords, setManualMarkerCoords] = useState<LatLng | null>(null);
   const [manualMarkerName, setManualMarkerName] = useState('');
+  const [placeCache, setPlaceCache] = useState<Record<string, CacheData>>({});
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const CENTER: LatLng = { latitude: 32.6245, longitude: -115.4523 };
 
-  const defaultMarkers: MarkerData[] = [
+  const defaultMarkers: MarkerData[] = React.useMemo(() => [
     {
       id: 'default1',
       coordinate: { latitude: 32.6280, longitude: -115.4550 },
       name: 'Lugar de Interés',
       address: 'Información general',
-      pinColor: '#6200ee', // color por defecto (morado)
+      pinColor: '#6200ee',
     },
-  ];
+  ], []);
 
-  // Instancia del servicio de Google Places (usa tu propia API key)
+  // Initialize the Google Places service
   const placesService = new GooglePlacesService({ apiKey: 'APIKEY' });
 
+  // Initialize pendingTypes with confirmedTypes on mount
   useEffect(() => {
-    updateMarkers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTypes]);
+    setPendingTypes(confirmedTypes);
+    // Load favorite markers from storage if needed
+    // loadFavoriteMarkers();
+  }, []);
 
-  const updateMarkers = async () => {
-    const newMarkers: MarkerData[] = [...defaultMarkers];
-
-    // Llama a la API para cada categoría seleccionada, excepto "favoritos"
-    for (const type of selectedTypes) {
-      if (type.toLowerCase() !== 'favoritos') {
-        const results = await placesService.fetchPlaces({
-          latitude: CENTER.latitude,
-          longitude: CENTER.longitude,
-          query: type,
-        });
-        results.forEach((place: any) => {
-          const geometry = place.geometry;
-          if (!geometry) return;
-          const { lat, lng } = geometry.location;
-          const markerId = place.place_id || `manual_${lat}_${lng}`;
-
-          // Define el color del pin según la categoría
-          let pinColor = '#FF0000'; // rojo por defecto
-          switch (type) {
-            case 'gym':
-              pinColor = '#9C27B0'; // morado
-              break;
-            case 'store':
-              pinColor = '#2196F3'; // azul
-              break;
-            case 'bar':
-              pinColor = '#FF9800'; // naranja
-              break;
-            case 'restaurant':
-              pinColor = '#4CAF50'; // verde
-              break;
-          }
-
-          newMarkers.push({
-            id: markerId,
-            coordinate: { latitude: lat, longitude: lng },
-            name: place.name,
-            address: place.formatted_address,
-            category: type,
-            pinColor,
-          });
-        });
-      }
-    }
-    setMarkers(newMarkers);
+  // Check if cache is expired
+  const isCacheExpired = (timestamp: number) => {
+    return Date.now() - timestamp > CACHE_EXPIRY_TIME;
   };
 
-  const isFavoriteMarker = (id: string) => favoriteMarkers.some((m) => m.id === id);
+  // Clean up any expired cache entries
+  const cleanupCache = useCallback(() => {
+    const updatedCache = { ...placeCache };
+    let hasRemovedEntries = false;
+
+    for (const type in updatedCache) {
+      if (isCacheExpired(updatedCache[type].timestamp)) {
+        delete updatedCache[type];
+        hasRemovedEntries = true;
+      }
+    }
+
+    if (hasRemovedEntries) {
+      setPlaceCache(updatedCache);
+    }
+  }, [placeCache]);
+
+  // Run cache cleanup periodically
+  useEffect(() => {
+    cleanupCache();
+    const intervalId = setInterval(cleanupCache, CACHE_EXPIRY_TIME / 24); // Check cache ~ every hour
+    return () => clearInterval(intervalId);
+  }, [cleanupCache]);
+
+  const updateMarkers = useCallback(async () => {
+    setIsLoading(true);
+    let newMarkers: MarkerData[] = [...defaultMarkers];
+    const typesToFetch: string[] = [];
+
+    // First, check which types we need to fetch
+    for (const type of confirmedTypes) {
+      if (type.toLowerCase() === 'favoritos') {
+        continue; // Skip favoritos, we'll handle these separately
+      }
+      
+      // Check if we have valid cached data
+      if (
+        placeCache[type] && 
+        placeCache[type].markers.length > 0 && 
+        !isCacheExpired(placeCache[type].timestamp)
+      ) {
+        newMarkers = [...newMarkers, ...placeCache[type].markers];
+      } else {
+        typesToFetch.push(type);
+      }
+    }
+    
+    // Fetch any missing types
+    if (typesToFetch.length > 0) {
+      for (const type of typesToFetch) {
+        try {
+          console.log(`Fetching places for: ${type}`);
+          const results = await placesService.fetchPlaces({
+            latitude: CENTER.latitude,
+            longitude: CENTER.longitude,
+            query: type,
+          });
+          
+          if (!results || results.length === 0) {
+            console.log(`No results found for: ${type}`);
+            continue;
+          }
+          
+          const typeMarkers: MarkerData[] = results
+            .filter((place: any) => place && place.geometry)
+            .map((place: any) => {
+              const { lat, lng } = place.geometry.location;
+              const markerId = place.place_id || `manual_${lat}_${lng}`;
+  
+              // Define pin color based on category
+              let pinColor = '#FF0000';
+              switch (type) {
+                case 'gym': pinColor = '#9C27B0'; break;
+                case 'store': pinColor = '#2196F3'; break;
+                case 'bar': pinColor = '#FF9800'; break; 
+                case 'restaurant': pinColor = '#4CAF50'; break;
+              }
+  
+              return {
+                id: markerId,
+                coordinate: { latitude: lat, longitude: lng },
+                name: place.name || 'Unknown Place',
+                address: place.formatted_address || '',
+                category: type,
+                pinColor,
+                timestamp: Date.now(),
+              };
+            });
+          
+          // Store in cache with timestamp
+          setPlaceCache(prev => ({
+            ...prev,
+            [type]: { 
+              markers: typeMarkers,
+              timestamp: Date.now()
+            }
+          }));
+          
+          // Add to current markers
+          newMarkers = [...newMarkers, ...typeMarkers];
+        } catch (error) {
+          console.error(`Error fetching places for ${type}:`, error);
+          Alert.alert(
+            'Error', 
+            `No se pudieron obtener lugares para: ${type}. Inténtalo de nuevo.`
+          );
+        }
+      }
+    }
+    
+    setMarkers(newMarkers);
+    setIsLoading(false);
+  }, [confirmedTypes, defaultMarkers, placeCache, placesService, CENTER]);
+
+  // Only update markers when confirmedTypes changes
+  useEffect(() => {
+    if (confirmedTypes.length > 0) {
+      updateMarkers();
+    } else {
+      setMarkers(defaultMarkers);
+    }
+  }, [confirmedTypes, updateMarkers, defaultMarkers]);
+
+  const handleApplyFilters = () => {
+    setConfirmedTypes([...pendingTypes]); // Create new array to ensure change detection
+    setHasChanges(false);
+  };
+
+  const toggleTypeSelection = (type: string) => {
+    setPendingTypes(prev => {
+      if (prev.includes(type)) {
+        return prev.filter(t => t !== type);
+      } 
+      return [...prev, type];
+    });
+    setHasChanges(true);
+  };
+
+  const isFavoriteMarker = useCallback((id: string) => {
+    return favoriteMarkers.some((m) => m.id === id);
+  }, [favoriteMarkers]);
 
   const toggleFavorite = (marker: MarkerData) => {
     if (isFavoriteMarker(marker.id)) {
       setFavoriteMarkers((prev) => prev.filter((m) => m.id !== marker.id));
     } else {
-      setFavoriteMarkers((prev) => [
-        ...prev,
-        { ...marker, category: 'favoritos', pinColor: '#bb86fc' }, // favorito con color lila
-      ]);
+      const favoriteMarker = { 
+        ...marker, 
+        category: 'favoritos', 
+        pinColor: '#bb86fc',
+        timestamp: Date.now()
+      };
+      setFavoriteMarkers((prev) => [...prev, favoriteMarker]);
+      
+      // Optional: Save favorites to persistent storage
+      // saveFavoriteMarkers([...favoriteMarkers, favoriteMarker]);
     }
   };
+
+  // Calculate markers to show - memoize this for performance
+  const markersToShow = React.useMemo(() => {
+    if (confirmedTypes.includes('favoritos')) {
+      // Return both regular markers and favorites (avoiding duplicates)
+      const markerIds = new Set(markers.map(m => m.id));
+      const uniqueFavorites = favoriteMarkers.filter(m => !markerIds.has(m.id));
+      return [...markers, ...uniqueFavorites];
+    }
+    return markers;
+  }, [markers, favoriteMarkers, confirmedTypes]);
 
   const handleLongPress = (e: any) => {
     if (!isAddingPlace) return;
@@ -151,8 +279,6 @@ export default function MapScreen() {
     }
   };
 
-  const markersToShow: MarkerData[] = selectedTypes.includes('favoritos') ? favoriteMarkers : markers;
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -163,18 +289,12 @@ export default function MapScreen() {
           showsHorizontalScrollIndicator={false}
         >
           {availablePlaceTypes.map((type) => {
-            const selected = selectedTypes.includes(type);
+            const selected = pendingTypes.includes(type);
             return (
               <TouchableOpacity
                 key={type}
                 style={[styles.chip, selected && styles.chipSelected]}
-                onPress={() => {
-                  if (selected) {
-                    setSelectedTypes((prev) => prev.filter((t) => t !== type));
-                  } else {
-                    setSelectedTypes((prev) => [...prev, type]);
-                  }
-                }}
+                onPress={() => toggleTypeSelection(type)}
               >
                 <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
                   {type.toUpperCase()}
@@ -183,7 +303,20 @@ export default function MapScreen() {
             );
           })}
         </ScrollView>
+        
+        {hasChanges && (
+          <TouchableOpacity 
+            style={styles.confirmButton}
+            onPress={handleApplyFilters}
+            disabled={isLoading}
+          >
+            <Text style={styles.confirmButtonText}>
+              {isLoading ? 'Buscando...' : 'Aplicar Filtros'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
+      
       <View style={styles.mapContainer}>
         <MapView
           style={styles.map}
@@ -205,7 +338,9 @@ export default function MapScreen() {
               onCalloutPress={() => {
                 Alert.alert(
                   marker.name,
-                  isFavoriteMarker(marker.id) ? '¿Quitar de favoritos?' : '¿Agregar a favoritos?',
+                  isFavoriteMarker(marker.id) 
+                    ? '¿Quitar de favoritos?' 
+                    : '¿Agregar a favoritos?',
                   [
                     { text: 'Cancelar', style: 'cancel' },
                     {
@@ -218,7 +353,15 @@ export default function MapScreen() {
             />
           ))}
         </MapView>
+        
+        {isLoading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#bb86fc" />
+            <Text style={styles.loadingText}>Buscando lugares...</Text>
+          </View>
+        )}
       </View>
+      
       <TouchableOpacity 
         style={[
           styles.addButton, 
@@ -235,6 +378,7 @@ export default function MapScreen() {
           {isAddingPlace ? 'Cancelar' : 'Agregar Lugar'}
         </Text>
       </TouchableOpacity>
+      
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -271,7 +415,12 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#121212' },
-  header: { backgroundColor: '#1e1e1e', paddingVertical: 10, elevation: 2 },
+  header: { 
+    backgroundColor: '#1e1e1e', 
+    paddingVertical: 10, 
+    elevation: 2,
+    paddingBottom: 16,
+  },
   chipsContainer: { flexGrow: 1 },
   chipsContent: { paddingHorizontal: 16 },
   chip: {
@@ -289,6 +438,19 @@ const styles = StyleSheet.create({
   },
   chipText: { color: '#fff', fontSize: 14 },
   chipTextSelected: { color: '#121212', fontWeight: 'bold' },
+  confirmButton: {
+    backgroundColor: '#FF4081',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 25,
+    marginTop: 10,
+    alignSelf: 'center',
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
   mapContainer: { flex: 1 },
   map: { flex: 1 },
   addButton: {
@@ -376,5 +538,21 @@ const styles = StyleSheet.create({
   },
   agregarButtonActive: {
     backgroundColor: '#FF4081', // Brighter pink color when active
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#fff',
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

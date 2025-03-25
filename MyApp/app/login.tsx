@@ -1,5 +1,6 @@
+// login.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { 
   signInWithEmailAndPassword, 
@@ -7,39 +8,54 @@ import {
   signInWithCredential, 
   GoogleAuthProvider 
 } from 'firebase/auth';
-import { auth } from '../firebase'; // Ajusta la ruta a tu archivo de configuración de Firebase
+import { auth } from '../firebase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 
-// Completa el flujo de autenticación cuando regresas a la app
+// Cierra el flujo OAuth cuando regresas a la app
 WebBrowser.maybeCompleteAuthSession();
+
+// Ajusta estos IDs con los que obtuviste en Google Cloud Console
+// Usa tu ID de cliente de tipo "Web" para clientId (cuando usas Expo Go).
+const WEB_CLIENT_ID = 'TU_WEB_CLIENT_ID.apps.googleusercontent.com';
+const IOS_CLIENT_ID = '497729458678-oovq36fgcgdm6ho6unb5rql4gg30cupn.apps.googleusercontent.com';
+const ANDROID_CLIENT_ID = 'TU_ANDROID_CLIENT_ID.apps.googleusercontent.com';
+
+// Genera manualmente la URL de redirección con tu usuario y slug
+// Por ejemplo: https://auth.expo.io/@jesse05/MyApp
+const REDIRECT_URI = 'https://auth.expo.io/@jesse05/MyApp';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   // Configura la solicitud de autenticación para Google
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: 'TU_EXPO_CLIENT_ID.apps.googleusercontent.com',
-    iosClientId: '497729458678-oovq36fgcgdm6ho6unb5rql4gg30cupn.apps.googleusercontent.com',
-    androidClientId: 'TU_ANDROID_CLIENT_ID.apps.googleusercontent.com',
-    webClientId: 'TU_WEB_CLIENT_ID.apps.googleusercontent.com',
+    redirectUri: REDIRECT_URI, // URI manual
+    clientId: WEB_CLIENT_ID,
+    iosClientId: IOS_CLIENT_ID,
+    androidClientId: ANDROID_CLIENT_ID,
     scopes: ['profile', 'email'],
   });
 
-  // Cuando el usuario complete el flujo de autenticación con Google
+  // Manejo de la respuesta de Google
   useEffect(() => {
     if (response?.type === 'success') {
       const { id_token } = response.params;
-      const credential = GoogleAuthProvider.credential(id_token);
-      signInWithCredential(auth, credential)
-        .then(() => {
-          router.replace('./(tabs)/feed');
-        })
-        .catch(error => {
-          Alert.alert('Error', error.message);
-        });
+      if (id_token) {
+        setLoading(true);
+        const credential = GoogleAuthProvider.credential(id_token);
+        signInWithCredential(auth, credential)
+          .then(() => {
+            router.replace('./(tabs)/feed');
+          })
+          .catch((error) => {
+            Alert.alert('Error en Google Login', error.message);
+          })
+          .finally(() => setLoading(false));
+      }
     }
   }, [response]);
 
@@ -49,25 +65,31 @@ export default function LoginScreen() {
       Alert.alert('Error', 'Introduce un correo válido y una contraseña de al menos 6 caracteres.');
       return;
     }
+    setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.replace('./(tabs)/feed');
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      Alert.alert('Error en Email Login', error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   // Login anónimo
   const handleAnonymousLogin = async () => {
+    setLoading(true);
     try {
       await signInAnonymously(auth);
       router.replace('./(tabs)/feed');
     } catch (error: any) {
-      Alert.alert('Error', error.message);
+      Alert.alert('Error en Login Anónimo', error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Login con Google: inicia el flujo de autenticación
+  // Login con Google
   const handleGoogleLogin = () => {
     promptAsync();
   };
@@ -93,16 +115,22 @@ export default function LoginScreen() {
         secureTextEntry
       />
 
-      <Button title="Ingresar (Email)" color="#6200ee" onPress={handleEmailLogin} />
-      <View style={{ marginVertical: 8 }} />
-      <Button title="Ingresar Anónimo" color="#6200ee" onPress={handleAnonymousLogin} />
-      <View style={{ marginVertical: 8 }} />
-      <Button 
-        title="Ingresar con Google" 
-        color="#6200ee" 
-        onPress={handleGoogleLogin} 
-        disabled={!request} 
-      />
+      {loading ? (
+        <ActivityIndicator size="large" color="#6200ee" />
+      ) : (
+        <>
+          <Button title="Ingresar (Email)" color="#6200ee" onPress={handleEmailLogin} />
+          <View style={{ marginVertical: 8 }} />
+          <Button title="Ingresar Anónimo" color="#6200ee" onPress={handleAnonymousLogin} />
+          <View style={{ marginVertical: 8 }} />
+          <Button 
+            title="Ingresar con Google" 
+            color="#6200ee" 
+            onPress={handleGoogleLogin} 
+            disabled={!request} 
+          />
+        </>
+      )}
     </View>
   );
 }
