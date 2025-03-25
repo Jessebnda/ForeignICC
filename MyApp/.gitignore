@@ -35,7 +35,4 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-node_modules
-.expo
-.DS_Store
 

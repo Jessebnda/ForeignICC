@@ -14,9 +14,14 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "bundleIdentifier": "com.foreign.app", // Aquí pones el que quieras usar
+      "client-id":"497729458678-oovq36fgcgdm6ho6unb5rql4gg30cupn.apps.googleusercontent.com",
       "supportsTablet": true
     },
     "android": {
+      
+      "package": "com.foreign.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"

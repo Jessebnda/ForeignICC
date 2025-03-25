@@ -1,24 +1,19 @@
 // firebase.js
-import firebase from 'firebase/app';
-import 'firebase/auth';
-import 'firebase/firestore';
-// Importa otros módulos que necesites (por ejemplo, storage, messaging)
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-    apiKey: "TU_API_KEY",
-    authDomain: "TU_AUTH_DOMAIN",
+    apiKey: "AIzaSyBgTukUaL5oSSSCG0y6i-g48HwGsE5Wt4M",
+    authDomain: "foreign-e6040.firebaseapp.com",
     projectId: "foreign-e6040",
-    storageBucket: "TU_STORAGE_BUCKET",
+    storageBucket: "foreign-e6040.firebasestorage.app",
     messagingSenderId: "497729458678",
-    appId: "TU_APP_ID"
+    appId: "1:497729458678:android:875fe19ecc24328f2cf7d7"
 };
 
-// Inicializa Firebase solo si aún no se ha inicializado
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
+const app = initializeApp(firebaseConfig);
 
-export const auth = firebase.auth();
-export const firestore = firebase.firestore();
-// Exporta otros servicios según necesites
-export default firebase;
+export const auth = getAuth(app);
+export const firestore = getFirestore(app);
+export default app;
