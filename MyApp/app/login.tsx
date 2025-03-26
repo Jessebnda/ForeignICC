@@ -19,12 +19,15 @@ import {
   signInAnonymously, 
   signInWithCredential,
   createUserWithEmailAndPassword,
-  GoogleAuthProvider 
+  GoogleAuthProvider,
+  updateProfile 
 } from 'firebase/auth';
 import { auth } from '../firebase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Cierra el flujo OAuth cuando regresas a la app
 WebBrowser.maybeCompleteAuthSession();
@@ -42,6 +45,16 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Nuevos estados para información de perfil
+  const [name, setName] = useState('');
+  const [originPlace, setOriginPlace] = useState('');
+  const [profileImage, setProfileImage] = useState('');
+  const [interests, setInterests] = useState<string[]>([]);
+  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+  
+  // Intereses disponibles
+  const availableInterests = ['deportes', 'gimnasio', 'programación', 'música', 'arte', 'viajes'];
 
   // Configura la solicitud de autenticación para Google
   const [request, response, promptAsync] = Google.useAuthRequest({
@@ -70,6 +83,23 @@ export default function LoginScreen() {
       }
     }
   }, [response]);
+
+  // Función para guardar datos de perfil en AsyncStorage
+  const saveProfileData = async (userId: string) => {
+    try {
+      const profileData = {
+        userId,
+        name: name || 'Usuario',
+        origin: originPlace || 'No especificado',
+        interests: interests.length > 0 ? interests : ['No especificado'],
+        profileImage: profileImageUri || '', // Guardar URI de la imagen seleccionada
+      };
+      
+      await AsyncStorage.setItem('userProfile', JSON.stringify(profileData));
+    } catch (error) {
+      console.error('Error al guardar datos de perfil:', error);
+    }
+  };
 
   // Login por correo
   const handleEmailLogin = async () => {
@@ -106,6 +136,15 @@ export default function LoginScreen() {
     promptAsync();
   };
 
+  // Toggle de intereses
+  const toggleInterest = (interest: string) => {
+    setInterests(prev => 
+      prev.includes(interest)
+        ? prev.filter(i => i !== interest)
+        : [...prev, interest]
+    );
+  };
+
   // Registro con email
   const handleSignUp = async () => {
     if (!email.includes('@')) {
@@ -123,7 +162,17 @@ export default function LoginScreen() {
     
     setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Actualizar perfil del usuario con el nombre e imagen
+      await updateProfile(userCredential.user, {
+        displayName: name,
+        photoURL: profileImageUri || null
+      });
+      
+      // Guardar datos adicionales en AsyncStorage
+      await saveProfileData(userCredential.user.uid);
+      
       Alert.alert('¡Éxito!', 'Cuenta creada correctamente');
       router.replace('./(tabs)/feed');
     } catch (error: any) {
@@ -133,6 +182,58 @@ export default function LoginScreen() {
     }
   };
 
+  // Función para seleccionar imagen de la galería
+  const pickImage = async () => {
+    // Solicitar permisos
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (status !== 'granted') {
+      Alert.alert('Permiso denegado', 'Necesitamos permiso para acceder a tu galería de fotos');
+      return;
+    }
+    
+    // Abrir selector de imágenes
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+    
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setProfileImageUri(result.assets[0].uri);
+    }
+  };
+
+  // Renderizado de la parte de imagen en el formulario de registro
+  const renderImagePicker = () => (
+    <View style={styles.imagePickerContainer}>
+      <Text style={styles.interestsLabel}>Foto de perfil:</Text>
+      {profileImageUri ? (
+        <View style={styles.imagePreviewContainer}>
+          <Image 
+            source={{ uri: profileImageUri }} 
+            style={styles.imagePreview} 
+          />
+          <TouchableOpacity 
+            style={styles.changeImageButton}
+            onPress={pickImage}
+          >
+            <Text style={styles.changeImageText}>Cambiar</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity 
+          style={styles.imagePickerButton}
+          onPress={pickImage}
+        >
+          <Ionicons name="camera" size={24} color="#fff" />
+          <Text style={styles.imagePickerText}>Seleccionar imagen</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -140,9 +241,12 @@ export default function LoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
+        <View style={styles.logoContainer}>
+          <Image source={require('../assets/images/logo.png.jpeg')} style={styles.logo} />
+          <Text style={styles.appName}>Foreing</Text>
+        </View>
         
         <View style={styles.formCard}>
-          {/* Cabecera de pestañas */}
           <View style={styles.tabContainer}>
             <TouchableOpacity 
               style={[styles.tab, activeTab === 'login' && styles.activeTab]}
@@ -166,7 +270,6 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Formulario de Login */}
           {activeTab === 'login' ? (
             <View style={styles.formContent}>
               <View style={styles.inputContainer}>
@@ -215,8 +318,54 @@ export default function LoginScreen() {
               )}
             </View>
           ) : (
-            /* Formulario de Registro */
             <View style={styles.formContent}>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={20} color="#888" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Nombre completo"
+                  placeholderTextColor="#888"
+                  value={name}
+                  onChangeText={setName}
+                />
+              </View>
+              
+              <View style={styles.inputContainer}>
+                <Ionicons name="location-outline" size={20} color="#888" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Lugar de origen"
+                  placeholderTextColor="#888"
+                  value={originPlace}
+                  onChangeText={setOriginPlace}
+                />
+              </View>
+              
+              {renderImagePicker()}
+              
+              <Text style={styles.interestsLabel}>Intereses (selecciona al menos uno):</Text>
+              <View style={styles.interestsContainer}>
+                {availableInterests.map(interest => (
+                  <TouchableOpacity 
+                    key={interest}
+                    style={[
+                      styles.interestChip,
+                      interests.includes(interest) && styles.interestChipSelected
+                    ]}
+                    onPress={() => toggleInterest(interest)}
+                  >
+                    <Text 
+                      style={[
+                        styles.interestChipText,
+                        interests.includes(interest) && styles.interestChipTextSelected
+                      ]}
+                    >
+                      {interest}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
               <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={20} color="#888" style={styles.inputIcon} />
                 <TextInput
@@ -358,6 +507,37 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
   },
+  interestsLabel: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  interestsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  interestChip: {
+    backgroundColor: '#2a2a2a',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    margin: 4,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  interestChipSelected: {
+    backgroundColor: '#bb86fc',
+    borderColor: '#bb86fc',
+  },
+  interestChipText: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  interestChipTextSelected: {
+    color: '#121212',
+    fontWeight: 'bold',
+  },
   loader: {
     marginVertical: 20,
   },
@@ -392,5 +572,45 @@ const styles = StyleSheet.create({
   },
   buttonIcon: {
     marginRight: 10,
+  },
+  imagePickerContainer: {
+    marginBottom: 16,
+  },
+  imagePickerButton: {
+    backgroundColor: '#2a2a2a',
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 8,
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  imagePickerText: {
+    color: '#fff',
+    marginTop: 8,
+  },
+  imagePreviewContainer: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  imagePreview: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: '#bb86fc',
+  },
+  changeImageButton: {
+    backgroundColor: '#2a2a2a',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  changeImageText: {
+    color: '#bb86fc',
+    fontWeight: 'bold',
   },
 });
