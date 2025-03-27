@@ -1,9 +1,9 @@
+// MapScreen.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View,
   Text,
   StyleSheet,
-  Dimensions,
   TouchableOpacity,
   Modal,
   TextInput,
@@ -14,68 +14,39 @@ import {
 } from 'react-native';
 import MapView, { Marker, LatLng } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { GooglePlacesService } from '../services/googlePlacesService';
-
-type MarkerData = {
-  id: string;
-  coordinate: LatLng;
-  name: string;
-  address?: string;
-  category?: string;
-  pinColor?: string;
-  timestamp?: number; // Para expiración de caché
-};
-
-type CacheData = {
-  markers: MarkerData[];
-  timestamp: number;
-};
+import { useMarkers, MarkerData } from '../extra/useMarkers'; // Ajusta la ruta según tu estructura
 
 const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
-const CACHE_EXPIRY_TIME = 24 * 60 * 60 * 1000; // 24 horas
 
 export default function MapScreen() {
-  // Estados originales de tus marcadores y filtros
-  const [markers, setMarkers] = useState<MarkerData[]>([]);
-  const [favoriteMarkers, setFavoriteMarkers] = useState<MarkerData[]>([]);
+  // Estados para filtros y marcadores (funcionalidad original)
   const [pendingTypes, setPendingTypes] = useState<string[]>([]);
   const [confirmedTypes, setConfirmedTypes] = useState<string[]>([]);
   const [isAddingPlace, setIsAddingPlace] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [manualMarkerCoords, setManualMarkerCoords] = useState<LatLng | null>(null);
   const [manualMarkerName, setManualMarkerName] = useState('');
-  const [placeCache, setPlaceCache] = useState<Record<string, CacheData>>({});
+  const [favoriteMarkers, setFavoriteMarkers] = useState<MarkerData[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Estado para la ubicación real del usuario
+  // Ubicación del usuario
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
 
-  // Estado para "Pedir Raite"
+  // Funcionalidad "Pedir Raite"
   const [isRaiteActive, setIsRaiteActive] = useState(false);
   const [selectedRaitePlace, setSelectedRaitePlace] = useState<LatLng | null>(null);
   const [raiteConfirmModalVisible, setRaisteConfirmModalVisible] = useState(false);
   const [friendSelectionModalVisible, setFriendSelectionModalVisible] = useState(false);
   type Friend = { id: string; name: string; };
-  const [dummyFriends, setDummyFriends] = useState<Friend[]>([
+  const [dummyFriends] = useState<Friend[]>([
     { id: '1', name: 'Amigo 1' },
     { id: '2', name: 'Amigo 2' },
   ]);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
 
-  // Centro por defecto (se usa si no se obtiene la ubicación)
   const CENTER: LatLng = { latitude: 32.6245, longitude: -115.4523 };
 
-  // Inicializar el servicio de Google Places
-  const placesService = new GooglePlacesService({ apiKey: 'APIKEY' });
-
-  // Al montar, se inicializan los pendingTypes y se pueden cargar favoritos
-  useEffect(() => {
-    setPendingTypes(confirmedTypes);
-    // loadFavoriteMarkers(); // Si los tienes en almacenamiento
-  }, []);
-
-  // Solicitar permisos y obtener la ubicación real del usuario con Expo Location
+  // Solicitar permisos y obtener la ubicación real con Expo Location
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -91,132 +62,23 @@ export default function MapScreen() {
     })();
   }, []);
 
-  // Funciones para caché de lugares
-  const isCacheExpired = (timestamp: number) => {
-    return Date.now() - timestamp > CACHE_EXPIRY_TIME;
-  };
-
-  const cleanupCache = useCallback(() => {
-    // Only update if something actually changed
-    setPlaceCache(prevCache => {
-      const updatedCache = { ...prevCache };
-      let hasRemovedEntries = false;
-      
-      for (const type in updatedCache) {
-        if (isCacheExpired(updatedCache[type].timestamp)) {
-          delete updatedCache[type];
-          hasRemovedEntries = true;
-        }
-      }
-      
-      // Only return new object if something changed
-      return hasRemovedEntries ? updatedCache : prevCache;
-    });
-  }, []); // Remove placeCache dependency
-
+  // Inicializa pendingTypes al montar (o podrías cargar desde almacenamiento)
   useEffect(() => {
-    cleanupCache();
-    const intervalId = setInterval(cleanupCache, CACHE_EXPIRY_TIME / 24);
-    return () => clearInterval(intervalId);
-  }, [cleanupCache]);
+    setPendingTypes(confirmedTypes);
+  }, []);
 
-  const updateMarkers = useCallback(async () => {
-    setIsLoading(true);
-    let newMarkers: MarkerData[] = [];
-    const typesToFetch: string[] = [];
-    
-    // Get current confirmedTypes and placeCache from within the callback
-    // instead of from the dependency array
-    const currentConfirmedTypes = confirmedTypes;
-    
-    // Use a function to access the latest placeCache state
-    setPlaceCache(currentCache => {
-      // Verify which types need to be fetched based on current cache
-      for (const type of currentConfirmedTypes) {
-        if (type.toLowerCase() === 'favoritos') continue;
-        if (
-          currentCache[type] && 
-          currentCache[type].markers.length > 0 && 
-          !isCacheExpired(currentCache[type].timestamp)
-        ) {
-          newMarkers = [...newMarkers, ...currentCache[type].markers];
-        } else {
-          typesToFetch.push(type);
-        }
-      }
-      
-      // Return the same cache for now - we'll update it later if needed
-      return currentCache;
-    });
-    
-    if (typesToFetch.length > 0) {
-      const currentLocation = userLocation || CENTER;
-      
-      for (const type of typesToFetch) {
-        try {
-          console.log(`Fetching places for: ${type}`);
-          const results = await placesService.fetchPlaces({
-            latitude: currentLocation.latitude,
-            longitude: currentLocation.longitude,
-            query: type,
-          });
-          
-          if (!results || results.length === 0) continue;
-          
-          const typeMarkers: MarkerData[] = results
-            .filter((place: any) => place && place.geometry)
-            .map((place: any) => {
-              const { lat, lng } = place.geometry.location;
-              const markerId = place.place_id || `manual_${lat}_${lng}`;
-              let pinColor = '#FF0000';
-              switch (type) {
-                case 'gym': pinColor = '#9C27B0'; break;
-                case 'store': pinColor = '#2196F3'; break;
-                case 'bar': pinColor = '#FF9800'; break; 
-                case 'restaurant': pinColor = '#4CAF50'; break;
-              }
-              return {
-                id: markerId,
-                coordinate: { latitude: lat, longitude: lng },
-                name: place.name || 'Unknown Place',
-                address: place.formatted_address || '',
-                category: type,
-                pinColor,
-                timestamp: Date.now(),
-              };
-            });
-          
-          // Update the cache for this specific type only
-          setPlaceCache(prevCache => ({
-            ...prevCache,
-            [type]: { 
-              markers: typeMarkers,
-              timestamp: Date.now()
-            }
-          }));
-          
-          newMarkers = [...newMarkers, ...typeMarkers];
-        } catch (error) {
-          console.error(`Error fetching places for ${type}:`, error);
-        }
-      }
-    }
-    
-    setMarkers(newMarkers);
-    setIsLoading(false);
-  }, [userLocation, placesService]); // Remove confirmedTypes and placeCache
+  // Hook personalizado para obtener marcadores (excluye "favoritos")
+  const { markers, isLoading } = useMarkers(confirmedTypes, userLocation);
 
-  useEffect(() => {
-    if (confirmedTypes.length > 0) {
-      // Use a timeout to break the immediate cycle
-      const timer = setTimeout(() => {
-        updateMarkers();
-      }, 0);
-      return () => clearTimeout(timer);
-    } else {
-      setMarkers([]);
+  // Combina marcadores con favoritos si se selecciona "favoritos"
+  const markersToShow = React.useMemo(() => {
+    if (confirmedTypes.includes('favoritos')) {
+      const markerIds = new Set(markers.map(m => m.id));
+      const uniqueFavorites = favoriteMarkers.filter(m => !markerIds.has(m.id));
+      return [...markers, ...uniqueFavorites];
     }
-  }, [confirmedTypes, updateMarkers]);
+    return markers;
+  }, [markers, favoriteMarkers, confirmedTypes]);
 
   const handleApplyFilters = () => {
     setConfirmedTypes([...pendingTypes]);
@@ -246,15 +108,6 @@ export default function MapScreen() {
     }
   };
 
-  const markersToShow = React.useMemo(() => {
-    if (confirmedTypes.includes('favoritos')) {
-      const markerIds = new Set(markers.map(m => m.id));
-      const uniqueFavorites = favoriteMarkers.filter(m => !markerIds.has(m.id));
-      return [...markers, ...uniqueFavorites];
-    }
-    return markers;
-  }, [markers, favoriteMarkers, confirmedTypes]);
-
   const handleLongPress = (e: any) => {
     if (!isAddingPlace) return;
     setManualMarkerCoords(e.nativeEvent.coordinate);
@@ -273,9 +126,9 @@ export default function MapScreen() {
       address: 'Lugar agregado manualmente',
       category: 'favoritos',
       pinColor: '#bb86fc',
+      timestamp: Date.now(),
     };
     setFavoriteMarkers(prev => [...prev, newMarker]);
-    setMarkers(prev => [...prev, newMarker]);
     setManualMarkerName('');
     setManualMarkerCoords(null);
     setModalVisible(false);
@@ -283,14 +136,14 @@ export default function MapScreen() {
   };
 
   const toggleAddingPlace = () => {
-    setIsAddingPlace(!isAddingPlace);
+    setIsAddingPlace(prev => !prev);
     if (isAddingPlace) {
       setManualMarkerCoords(null);
       setManualMarkerName('');
     }
   };
 
-  // Funciones para la funcionalidad "Pedir Raite"
+  // Funciones para "Pedir Raite"
   const handleMapPress = (e: any) => {
     const coordinate: LatLng = e.nativeEvent.coordinate;
     if (isRaiteActive) {
@@ -330,60 +183,53 @@ export default function MapScreen() {
     }
   };
 
+  // ─── CONDICIONAL PARA CARGAR EL MAPA ─────────────────────────────
+  // Si no se ha obtenido la ubicación (o aún se está cargando), mostramos un indicador.
+  if (!userLocation) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#bb86fc" />
+        <Text style={styles.loadingText}>Cargando ubicación...</Text>
+      </SafeAreaView>
+    );
+  }
+  // ───────────────────────────────────────────────────────────────────
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header con filtros */}
       <View style={styles.header}>
         <ScrollView horizontal style={styles.chipsContainer} contentContainerStyle={styles.chipsContent} showsHorizontalScrollIndicator={false}>
           {availablePlaceTypes.map(type => {
             const selected = pendingTypes.includes(type);
             return (
-              <TouchableOpacity
-                key={type}
-                style={[styles.chip, selected && styles.chipSelected]}
-                onPress={() => toggleTypeSelection(type)}
-              >
-                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                  {type.toUpperCase()}
-                </Text>
+              <TouchableOpacity key={type} style={[styles.chip, selected && styles.chipSelected]} onPress={() => toggleTypeSelection(type)}>
+                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{type.toUpperCase()}</Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
         {hasChanges && (
-          <TouchableOpacity 
-            style={styles.confirmButton}
-            onPress={handleApplyFilters}
-            disabled={isLoading}
-          >
-            <Text style={styles.confirmButtonText}>
-              {isLoading ? 'Buscando...' : 'Aplicar Filtros'}
-            </Text>
+          <TouchableOpacity style={styles.confirmButton} onPress={handleApplyFilters} disabled={isLoading}>
+            <Text style={styles.confirmButtonText}>{isLoading ? 'Buscando...' : 'Aplicar Filtros'}</Text>
           </TouchableOpacity>
         )}
       </View>
       
+      {/* Mapa */}
       <View style={styles.mapContainer}>
         <MapView
           style={styles.map}
-          // Se centra el mapa en la ubicación real si está disponible; en caso contrario se usa CENTER
           initialRegion={{
-            latitude: userLocation ? userLocation.latitude : CENTER.latitude,
-            longitude: userLocation ? userLocation.longitude : CENTER.longitude,
+            latitude: userLocation.latitude,
+            longitude: userLocation.longitude,
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           }}
           onLongPress={handleLongPress}
-          // Si el modo raite está activo, usamos onPress para capturar la selección del lugar
           onPress={isRaiteActive ? handleMapPress : undefined}
         >
-          {/* Ubicación del usuario: marcador y círculo */}
-          {userLocation && (
-            <>
-              <Marker coordinate={userLocation} title="Tú" />
-            </>
-          )}
-          
-          {/* Se muestran los marcadores obtenidos */}
+          {userLocation && <Marker coordinate={userLocation} title="Tú" />}
           {markersToShow.map(marker => (
             <Marker
               key={marker.id}
@@ -397,15 +243,15 @@ export default function MapScreen() {
                   isFavoriteMarker(marker.id) ? '¿Quitar de favoritos?' : '¿Agregar a favoritos?',
                   [
                     { text: 'Cancelar', style: 'cancel' },
-                    { 
-                      text: isFavoriteMarker(marker.id) ? 'Quitar' : 'Agregar', 
-                      onPress: () => toggleFavorite(marker) 
-                    },
+                    { text: isFavoriteMarker(marker.id) ? 'Quitar' : 'Agregar', onPress: () => toggleFavorite(marker) },
                   ]
                 );
               }}
             />
           ))}
+          {isRaiteActive && selectedRaitePlace && (
+            <Marker coordinate={selectedRaitePlace} pinColor="orange" title="Lugar para Raite" />
+          )}
         </MapView>
         {isLoading && (
           <View style={styles.loadingOverlay}>
@@ -415,8 +261,8 @@ export default function MapScreen() {
         )}
       </View>
       
-      {/* Botón para agregar marcador manual (funcionalidad original) */}
-      <TouchableOpacity style={[styles.addButton]} onPress={toggleAddingPlace}>
+      {/* Botón para agregar marcador manual */}
+      <TouchableOpacity style={styles.addButton} onPress={toggleAddingPlace}>
         <Text style={styles.addButtonText}>{isAddingPlace ? 'Cancelar' : 'Agregar Lugar'}</Text>
       </TouchableOpacity>
       
@@ -454,7 +300,7 @@ export default function MapScreen() {
         </View>
       </Modal>
       
-      {/* Modal de confirmación para "Pedir Raite" */}
+      {/* Modal para confirmar "Pedir Raite" */}
       <Modal visible={raiteConfirmModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -502,6 +348,8 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#121212' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { color: '#fff', marginTop: 10, fontSize: 16, fontWeight: 'bold' },
   header: { backgroundColor: '#1e1e1e', paddingVertical: 10, paddingBottom: 16 },
   chipsContainer: {},
   chipsContent: { paddingHorizontal: 16 },
@@ -562,7 +410,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: { color: '#fff', marginTop: 10, fontSize: 16, fontWeight: 'bold' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
