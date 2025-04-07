@@ -4,6 +4,8 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, Button, 
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+
+
 const initialForumData = [
   {
     id: 'q1',

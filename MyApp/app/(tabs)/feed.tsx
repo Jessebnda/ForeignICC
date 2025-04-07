@@ -142,6 +142,12 @@ function WeeklyEventsSlider() {
 export default function FeedScreen() {
   const router = useRouter();
 
+  const goToCreatePost = () => {
+    router.push({
+      pathname: '/extra/crearpubli',
+    });
+  };
+  
   const goToPostDetail = (item: any) => {
     router.push({
       pathname: '/extra/publication-detail',
@@ -162,16 +168,23 @@ export default function FeedScreen() {
   );
 
   return (
-    <FlatList
-      data={postsData}
-      keyExtractor={(item) => item.id}
-      numColumns={2}
-      columnWrapperStyle={styles.postRow}
-      renderItem={renderPost}
-      ListHeaderComponent={<WeeklyEventsSlider />}
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-    />
+    <View style={{ flex: 1 }}>
+      <FlatList
+        data={postsData}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.postRow}
+        renderItem={renderPost}
+        ListHeaderComponent={<WeeklyEventsSlider />}
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+      />
+  
+      {/* Botón flotante para crear publicación */}
+      <TouchableOpacity style={styles.fab} onPress={goToCreatePost}>
+        <Text style={styles.fabText}>＋</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -279,4 +292,25 @@ const styles = StyleSheet.create({
     color: '#fff', 
     fontSize: 12 
   },
+  fab: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#4f0c2e',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+  },
+  fabText: {
+    color: 'white',
+    fontSize: 32,
+    lineHeight: 34,
+  },  
 });

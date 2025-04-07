@@ -1,9 +1,10 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "jsx": "react-native",   // Imprescindible para RN
-    "skipLibCheck": true,    // Evita conflictos de .d.ts
+    "jsx": "react-native",
+    "skipLibCheck": true,
     "strict": true,
+    "esModuleInterop": true,
     "paths": {
       "@/*": ["./*"]
     }
