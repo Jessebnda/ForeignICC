@@ -1,15 +1,37 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { router } from 'expo-router';
 
-export default function App() {
+export default function CrearPubli() {
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
 
-  // Selección desde galería
+  const toggleCameraFacing = () => {
+    setFacing((current) => (current === 'back' ? 'front' : 'back'));
+  };
+
+  // Toma de foto y procesamiento
+  const takePhoto = async () => {
+    if (cameraRef.current) {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+      const processed = await ImageManipulator.manipulateAsync(photo.uri, [], {
+        compress: 1,
+        format: ImageManipulator.SaveFormat.JPEG,
+      });
+
+      console.log("Imagen procesada:", processed.uri);
+      router.push({
+        pathname: "/(tabs)/save",
+        params: { image: processed.uri },
+      });
+    }
+  };
+
+  // Selección desde galería y procesamiento
   const pickImageFromLibrary = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -18,25 +40,17 @@ export default function App() {
     });
 
     if (!result.canceled) {
-      const uri = result.assets[0].uri;
-      Alert.alert('🖼 Imagen seleccionada', `URI: ${uri}`);
-      console.log('🖼 URI de galería:', uri);
+      const processed = await ImageManipulator.manipulateAsync(result.assets[0].uri, [], {
+        compress: 1,
+        format: ImageManipulator.SaveFormat.JPEG,
+      });
+      router.push({
+        pathname: "/(tabs)/save",
+        params: { image: processed.uri },
+      });
     } else {
       Alert.alert('No seleccionaste ninguna imagen');
     }
-  };
-
-  // Toma de foto
-  const takePhoto = async () => {
-    if (cameraRef.current) {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
-      Alert.alert('📸 Foto tomada', `URI: ${photo.uri}`);
-      console.log('📷 URI de la foto:', photo.uri);
-    }
-  };
-
-  const toggleCameraFacing = () => {
-    setFacing((current) => (current === 'back' ? 'front' : 'back'));
   };
 
   if (!permission) return <View />;
