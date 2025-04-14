@@ -142,6 +142,15 @@ function WeeklyEventsSlider() {
 export default function FeedScreen() {
   const router = useRouter();
 
+<<<<<<< Updated upstream
+=======
+  const goToCreatePost = () => {
+    router.push({
+      pathname: '/extra/createPost',
+    });
+  };
+  
+>>>>>>> Stashed changes
   const goToPostDetail = (item: any) => {
     router.push({
       pathname: '/extra/publication-detail',

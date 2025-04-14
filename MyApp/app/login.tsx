@@ -14,15 +14,7 @@ import {
   Image
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { 
-  signInWithEmailAndPassword, 
-  signInAnonymously, 
-  signInWithCredential,
-  createUserWithEmailAndPassword,
-  GoogleAuthProvider,
-  updateProfile 
-} from 'firebase/auth';
-import { auth } from '../firebase';
+import { supabase } from '../lib/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import * as ImagePicker from 'expo-image-picker';
@@ -65,21 +57,12 @@ export default function LoginScreen() {
     scopes: ['profile', 'email'],
   });
 
-  // Manejo de la respuesta de Google
+  // Handle Google OAuth response
   useEffect(() => {
     if (response?.type === 'success') {
       const { id_token } = response.params;
       if (id_token) {
-        setLoading(true);
-        const credential = GoogleAuthProvider.credential(id_token);
-        signInWithCredential(auth, credential)
-          .then(() => {
-            router.replace('./(tabs)/feed');
-          })
-          .catch((error) => {
-            Alert.alert('Error en Google Login', error.message);
-          })
-          .finally(() => setLoading(false));
+        handleGoogleLogin(id_token);
       }
     }
   }, [response]);
@@ -101,39 +84,67 @@ export default function LoginScreen() {
     }
   };
 
-  // Login por correo
+  const saveProfileDataToSupabase = async (userId: string) => {
+    try {
+      const { error } = await supabase.from('profiles').upsert({
+        id: userId,
+        name: name || 'Usuario',
+        origin: originPlace || 'No especificado',
+        interests: interests.length > 0 ? interests : ['No especificado'],
+        profile_image: profileImageUri || '',
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving profile data to Supabase:', error);
+    }
+  };
+
+  const handleGoogleLogin = async (idToken?: string) => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: idToken || '',
+      });
+
+      if (error) throw error;
+      
+      if (data?.user) {
+        await saveProfileDataToSupabase(data.user.id);
+        router.replace('/(tabs)/feed');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An error occurred during Google login');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleEmailLogin = async () => {
-    if (!email.includes('@') || password.length < 6) {
-      Alert.alert('Error', 'Introduce un correo válido y una contraseña de al menos 6 caracteres.');
+    if (!email || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
       return;
     }
+
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.replace('./(tabs)/feed');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      
+      if (data?.user) {
+        await saveProfileDataToSupabase(data.user.id);
+        router.replace('/(tabs)/feed');
+      }
     } catch (error: any) {
-      Alert.alert('Error en Login', error.message);
+      Alert.alert('Error', error.message || 'An error occurred during login');
     } finally {
       setLoading(false);
     }
-  };
-
-  // Login anónimo
-  const handleAnonymousLogin = async () => {
-    setLoading(true);
-    try {
-      await signInAnonymously(auth);
-      router.replace('./(tabs)/feed');
-    } catch (error: any) {
-      Alert.alert('Error en Login Anónimo', error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Login con Google
-  const handleGoogleLogin = () => {
-    promptAsync();
   };
 
   // Toggle de intereses
@@ -145,38 +156,38 @@ export default function LoginScreen() {
     );
   };
 
-  // Registro con email
   const handleSignUp = async () => {
-    if (!email.includes('@')) {
-      Alert.alert('Error', 'Introduce un correo electrónico válido');
+    if (!email || !password || !confirmPassword || !name) {
+      Alert.alert('Error', 'Please fill in all fields');
       return;
     }
-    if (password.length < 6) {
-      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
-      return;
-    }
+
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Las contraseñas no coinciden');
+      Alert.alert('Error', 'Passwords do not match');
       return;
     }
-    
+
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Actualizar perfil del usuario con el nombre e imagen
-      await updateProfile(userCredential.user, {
-        displayName: name,
-        photoURL: profileImageUri || null
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+          },
+        },
       });
-      
-      // Guardar datos adicionales en AsyncStorage
-      await saveProfileData(userCredential.user.uid);
-      
-      Alert.alert('¡Éxito!', 'Cuenta creada correctamente');
-      router.replace('./(tabs)/feed');
+
+      if (error) throw error;
+
+      if (data?.user) {
+        await saveProfileDataToSupabase(data.user.id);
+        Alert.alert('Success', 'Account created successfully! Please check your email for verification.');
+        setActiveTab('login');
+      }
     } catch (error: any) {
-      Alert.alert('Error en Registro', error.message);
+      Alert.alert('Error', error.message || 'An error occurred during signup');
     } finally {
       setLoading(false);
     }
@@ -305,14 +316,9 @@ export default function LoginScreen() {
                     <Text style={styles.buttonText}>Iniciar Sesión</Text>
                   </TouchableOpacity>
                   
-                  <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin} disabled={!request}>
+                  <TouchableOpacity style={styles.googleButton} onPress={() => promptAsync()} disabled={!request}>
                     <Ionicons name="logo-google" size={20} color="#fff" style={styles.buttonIcon} />
                     <Text style={styles.buttonText}>Continuar con Google</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.secondaryButton} onPress={handleAnonymousLogin}>
-                    <Ionicons name="person-outline" size={20} color="#fff" style={styles.buttonIcon} />
-                    <Text style={styles.buttonText}>Entrar como Invitado</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -411,7 +417,7 @@ export default function LoginScreen() {
                     <Text style={styles.buttonText}>Crear Cuenta</Text>
                   </TouchableOpacity>
                   
-                  <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin} disabled={!request}>
+                  <TouchableOpacity style={styles.googleButton} onPress={() => promptAsync()} disabled={!request}>
                     <Ionicons name="logo-google" size={20} color="#fff" style={styles.buttonIcon} />
                     <Text style={styles.buttonText}>Registrarse con Google</Text>
                   </TouchableOpacity>
@@ -556,14 +562,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 12,
-  },
-  secondaryButton: {
-    backgroundColor: '#333',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
   },
   buttonText: {
     color: '#fff',

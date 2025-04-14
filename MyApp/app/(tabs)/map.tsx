@@ -10,13 +10,97 @@ import {
   ScrollView,
   Alert,
   SafeAreaView,
-  ActivityIndicator 
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import MapView, { Marker, LatLng } from 'react-native-maps';
 import * as Location from 'expo-location';
+<<<<<<< Updated upstream
 import { useMarkers, MarkerData } from '../extra/useMarkers'; // Ajusta la ruta según tu estructura
+=======
+import { GooglePlacesService } from '../services/googlePlacesService';
+import { supabase } from '../services/supabaseClient';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+
+type MarkerData = {
+  id: string;
+  coordinate: LatLng;
+  name: string;
+  address?: string;
+  category?: string;
+  pinColor?: string;
+  timestamp?: number; // Para expiración de caché
+};
+
+type CacheData = {
+  markers: MarkerData[];
+  timestamp: number;
+};
+>>>>>>> Stashed changes
 
 const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
+
+// Configure notification handler
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
+
+// Function to register for push notifications
+async function registerForPushNotificationsAsync() {
+  let token;
+  if (Constants.isDevice) {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+      Alert.alert('Failed to get push token for push notification!');
+      return;
+    }
+    token = (await Notifications.getExpoPushTokenAsync()).data;
+    console.log(token);
+  } else {
+    Alert.alert('Must use physical device for Push Notifications');
+  }
+
+  if (Platform.OS === 'android') {
+    Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
+
+  return token;
+}
+
+// Call this function to send a notification
+async function sendPushNotification(expoPushToken: string, message: string) {
+  const messageData = {
+    to: expoPushToken,
+    sound: 'default',
+    title: 'Ride Request',
+    body: message,
+    data: { someData: 'goes here' },
+  };
+
+  await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(messageData),
+  });
+}
 
 export default function MapScreen() {
   // Estados para filtros y marcadores (funcionalidad original)
@@ -166,13 +250,52 @@ export default function MapScreen() {
     setSelectedFriends(prev => prev.includes(friendId) ? prev.filter(id => id !== friendId) : [...prev, friendId]);
   };
 
-  const sendRaiteRequest = () => {
-    Alert.alert('Solicitud Enviada', `Se ha enviado la solicitud de raite a: ${selectedFriends.join(', ')}`);
-    setFriendSelectionModalVisible(false);
-    setSelectedRaitePlace(null);
-    setSelectedFriends([]);
-    setIsRaiteActive(false);
+  // Function to find nearby friends
+  const findNearbyFriends = async () => {
+    if (!userLocation) return [];
+    const { latitude, longitude } = userLocation;
+    const { data, error } = await supabase
+      .from('user_locations')
+      .select('user_id')
+      .neq('user_id', 'current_user_id') // Replace with actual current user ID
+      .lt('latitude', latitude + 0.1)
+      .gt('latitude', latitude - 0.1)
+      .lt('longitude', longitude + 0.1)
+      .gt('longitude', longitude - 0.1);
+    if (error) {
+      console.error('Error finding nearby friends:', error);
+      return [];
+    }
+    return data.map(friend => friend.user_id);
   };
+
+  // Update the sendRaiteRequest function to send a notification
+  const sendRaiteRequest = useCallback(async () => {
+    setIsLoading(true);
+    const nearbyFriends = await findNearbyFriends();
+    if (nearbyFriends.length === 0) {
+      Alert.alert('No friends nearby', 'No friends are currently nearby to request a ride.');
+      setIsLoading(false);
+      return;
+    }
+    const { error } = await supabase
+      .from('ride_requests')
+      .insert({
+        requester_id: 'current_user_id', // Replace with actual current user ID
+        driver_id: nearbyFriends[0], // For simplicity, choose the first nearby friend
+        status: 'pending'
+      });
+    if (error) {
+      console.error('Error sending ride request:', error);
+      Alert.alert('Error', 'Could not send ride request.');
+    } else {
+      Alert.alert('Ride request sent', 'Your ride request has been sent to a nearby friend.');
+      // Send notification to the driver
+      const driverToken = 'driver_expo_push_token'; // Replace with actual token
+      await sendPushNotification(driverToken, 'You have a new ride request!');
+    }
+    setIsLoading(false);
+  }, [userLocation]);
 
   const toggleRaiteMode = () => {
     setIsRaiteActive(prev => !prev);
@@ -183,6 +306,7 @@ export default function MapScreen() {
     }
   };
 
+<<<<<<< Updated upstream
   // ─── CONDICIONAL PARA CARGAR EL MAPA ─────────────────────────────
   // Si no se ha obtenido la ubicación (o aún se está cargando), mostramos un indicador.
   if (!userLocation) {
@@ -194,6 +318,28 @@ export default function MapScreen() {
     );
   }
   // ───────────────────────────────────────────────────────────────────
+=======
+  // Register for push notifications on component mount
+  useEffect(() => {
+    registerForPushNotificationsAsync();
+  }, []);
+
+  // Set up real-time listener for ride requests
+  useEffect(() => {
+    const channel = supabase
+      .channel('custom-all-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ride_requests' }, payload => {
+        console.log('Change received!', payload);
+        // Handle the change in ride requests here
+      })
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+>>>>>>> Stashed changes
 
   return (
     <SafeAreaView style={styles.container}>
