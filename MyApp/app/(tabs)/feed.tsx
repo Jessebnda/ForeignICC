@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,72 +8,30 @@ import {
   TouchableOpacity,
   Text
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { firestore } from '../../firebase';
 
 const { width } = Dimensions.get('window');
-const horizontalPadding = 16; // Padding en ambos lados
-const sliderWidth = width - horizontalPadding * 4; // Ancho efectivo del slider
+const horizontalPadding = 16;
+const sliderWidth = width - horizontalPadding * 4;
 
-// Datos para el slider (Weekly Events)
+// Slider de eventos locales (puedes reemplazar luego por datos reales)
 const weeklyEvents = [
-  { 
-    id: 'event1', 
+  {
+    id: 'event1',
     image: require('../../assets/images/img1.jpg'),
     user: { name: 'Juan Pérez', image: require('../../assets/images/img7.jpg') },
     content: 'Evento semanal de cultura local',
     likes: 12,
     comments: []
   },
-  { 
-    id: 'event2', 
+  {
+    id: 'event2',
     image: require('../../assets/images/img2.jpg'),
     user: { name: 'María López', image: require('../../assets/images/img7.jpg') },
     content: 'Exposición de arte moderno',
     likes: 8,
-    comments: []
-  },
-  { 
-    id: 'event3', 
-    image: require('../../assets/images/img3.jpg'),
-    user: { name: 'Carlos García', image: require('../../assets/images/img7.jpg') },
-    content: 'Concierto en el parque central',
-    likes: 15,
-    comments: []
-  },
-];
-
-// Datos para el grid de publicaciones
-const postsData = [
-  { 
-    id: 'post1', 
-    image: require('../../assets/images/img4.jpg'),
-    user: { name: 'Ana Martínez', image: require('../../assets/images/img7.jpg') },
-    content: 'Visitando el nuevo restaurante del centro',
-    likes: 7,
-    comments: []
-  },
-  { 
-    id: 'post2', 
-    image: require('../../assets/images/img5.jpg'),
-    user: { name: 'Pedro Sánchez', image: require('../../assets/images/img7.jpg') },
-    content: 'Paseando por el malecón',
-    likes: 9,
-    comments: []
-  },
-  {
-    id: 'profile-post1', 
-    image: require('../../assets/images/img1.jpg'),
-    user: { name: 'Jesse Banda', image: require('../../assets/images/img7.jpg') },
-    content: 'Disfrutando de un gran día en la ciudad',
-    likes: 15,
-    comments: []
-  },
-  { 
-    id: 'post4', 
-    image: require('../../assets/images/img7.jpg'),
-    user: { name: 'Roberto Díaz', image: require('../../assets/images/img7.jpg') },
-    content: 'Nueva exhibición en el museo',
-    likes: 11,
     comments: []
   },
 ];
@@ -108,22 +66,23 @@ function WeeklyEventsSlider() {
         onScroll={onScroll}
         scrollEventThrottle={16}
         renderItem={({ item }) => (
-          <TouchableOpacity 
-            activeOpacity={0.8} 
+          <TouchableOpacity
+            activeOpacity={0.8}
             onPress={() => goToPublicationDetail(item)}
             style={{ width: sliderWidth }}
           >
             <View style={[styles.roundedContainer, { width: sliderWidth }]}>
               <Image
-                source={item.image}
+                source={
+                  typeof item.image === 'string'
+                    ? { uri: `data:image/jpeg;base64,${item.image}` }
+                    : item.image
+                }
                 style={[styles.sliderImage, { width: sliderWidth, height: sliderWidth * 0.7 }]}
                 resizeMode="cover"
               />
               <View style={styles.sliderOverlay}>
-                <Image
-                  source={item.user.image}
-                  style={styles.publisherImage}
-                />
+                <Image source={item.user.image} style={styles.publisherImage} />
                 <Text style={styles.publisherName}>{item.user.name}</Text>
               </View>
             </View>
@@ -141,13 +100,12 @@ function WeeklyEventsSlider() {
 
 export default function FeedScreen() {
   const router = useRouter();
+  const [posts, setPosts] = useState<any[]>([]);
 
   const goToCreatePost = () => {
-    router.push({
-      pathname: '/extra/crearpubli',
-    });
+    router.push({ pathname: '/extra/crearpubli' });
   };
-  
+
   const goToPostDetail = (item: any) => {
     router.push({
       pathname: '/extra/publication-detail',
@@ -157,20 +115,64 @@ export default function FeedScreen() {
 
   const renderPost = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.postCard} onPress={() => goToPostDetail(item)}>
-      <Image source={item.image} style={styles.postImage} resizeMode="cover" />
+      <Image
+        source={
+          typeof item.image === 'string'
+            ? { uri: `data:image/jpeg;base64,${item.image}` }
+            : item.image
+        }
+        style={styles.postImage}
+        resizeMode="cover"
+      />
       <View style={styles.postOverlay}>
         <View style={styles.postUserInfo}>
-          <Image source={item.user.image} style={styles.postUserImage} />
+          <Image
+            source={item.user.image || require('../../assets/images/img7.jpg')}
+            style={styles.postUserImage}
+          />
           <Text style={styles.postUserName}>{item.user.name}</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 
+  // 🔄 Cargar publicaciones desde Firestore
+  useFocusEffect(
+    useCallback(() => {
+      const fetchPosts = async () => {
+        try {
+          const q = query(collection(firestore, 'feedPosts'), orderBy('createdAt', 'desc'));
+          const snapshot = await getDocs(q);
+
+          const loadedPosts = snapshot.docs.map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              image: data.base64Image,
+              user: {
+                name: data.userId,
+                image: require('../../assets/images/img7.jpg') // Puedes mejorar esto si guardas también el avatar
+              },
+              content: data.caption,
+              likes: data.likes ? Object.keys(data.likes).length : 0,
+              comments: data.comments || [],
+            };
+          });
+
+          setPosts(loadedPosts);
+        } catch (error) {
+          console.error('❌ Error al cargar publicaciones:', error);
+        }
+      };
+
+      fetchPosts();
+    }, [])
+  );
+
   return (
     <View style={{ flex: 1 }}>
       <FlatList
-        data={postsData}
+        data={posts}
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={styles.postRow}
@@ -179,8 +181,7 @@ export default function FeedScreen() {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
       />
-  
-      {/* Botón flotante para crear publicación */}
+
       <TouchableOpacity style={styles.fab} onPress={goToCreatePost}>
         <Text style={styles.fabText}>＋</Text>
       </TouchableOpacity>
@@ -189,29 +190,20 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#121212' 
-  },
-  contentContainer: { 
-    padding: 16 
-  },
-  /* --- Slider Styles --- */
+  container: { flex: 1, backgroundColor: '#121212' },
+  contentContainer: { padding: 16 },
+
+  // Slider
   sliderWrapper: { marginBottom: 24 },
-  sliderTitle: { 
-    fontSize: 28, 
-    color: '#fff', 
-    fontWeight: 'bold', 
+  sliderTitle: {
+    fontSize: 28,
+    color: '#fff',
+    fontWeight: 'bold',
     marginBottom: 12,
     textAlign: 'center',
   },
-  roundedContainer: { 
-    borderRadius: 20, 
-    overflow: 'hidden' 
-  },
-  sliderImage: { 
-    height: width * 0.7, // La altura se ajusta proporcionalmente al ancho del slider
-  },
+  roundedContainer: { borderRadius: 20, overflow: 'hidden' },
+  sliderImage: { height: width * 0.7 },
   sliderOverlay: {
     position: 'absolute',
     bottom: 10,
@@ -223,53 +215,36 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  publisherImage: { 
-    width: 30, 
-    height: 30, 
-    borderRadius: 15, 
-    borderWidth: 1, 
-    borderColor: '#fff', 
-    marginRight: 8 
+  publisherImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: '#fff',
+    marginRight: 8,
   },
-  publisherName: { 
-    color: '#fff', 
-    fontSize: 14, 
-    fontWeight: 'bold' 
+  publisherName: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  pagination: { flexDirection: 'row', alignSelf: 'center', marginTop: 8 },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'gray',
+    marginHorizontal: 4,
   },
-  pagination: { 
-    flexDirection: 'row', 
-    alignSelf: 'center', 
-    marginTop: 8 
-  },
-  dot: { 
-    width: 8, 
-    height: 8, 
-    borderRadius: 4, 
-    backgroundColor: 'gray', 
-    marginHorizontal: 4 
-  },
-  dotActive: { 
-    backgroundColor: '#bb86fc', 
-    width: 10, 
-    height: 10 
-  },
-  /* --- Posts Grid Styles --- */
-  postRow: { 
-    justifyContent: 'space-between', 
-    marginBottom: 16 
-  },
-  postCard: { 
-    width: '48%', 
-    borderRadius: 12, 
+  dotActive: { backgroundColor: '#bb86fc', width: 10, height: 10 },
+
+  // Grid de posts
+  postRow: { justifyContent: 'space-between', marginBottom: 16 },
+  postCard: {
+    width: '48%',
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#1e1e1e',
     marginBottom: 16,
     elevation: 2,
   },
-  postImage: { 
-    width: '100%', 
-    height: 140 
-  },
+  postImage: { width: '100%', height: 140 },
   postOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -278,20 +253,11 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  postUserInfo: { 
-    flexDirection: 'row', 
-    alignItems: 'center' 
-  },
-  postUserImage: { 
-    width: 20, 
-    height: 20, 
-    borderRadius: 10, 
-    marginRight: 6 
-  },
-  postUserName: { 
-    color: '#fff', 
-    fontSize: 12 
-  },
+  postUserInfo: { flexDirection: 'row', alignItems: 'center' },
+  postUserImage: { width: 20, height: 20, borderRadius: 10, marginRight: 6 },
+  postUserName: { color: '#fff', fontSize: 12 },
+
+  // FAB
   fab: {
     position: 'absolute',
     bottom: 30,
@@ -312,5 +278,5 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 32,
     lineHeight: 34,
-  },  
+  },
 });
