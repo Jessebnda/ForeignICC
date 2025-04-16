@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, TextInput, Image, Button, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
-import { storage, firestore, auth } from '../../firebase';
+import { firestore, auth } from '../../firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const Save = () => {
   const { image } = useLocalSearchParams();
@@ -25,14 +25,26 @@ const Save = () => {
     return unsubscribe;
   }, []);
 
-  // ✅ Blob compatible con React Native
-  const uriToBlob = async (uri: string): Promise<Blob> => {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    return blob;
+  // 🧠 Comprime y convierte la imagen a base64
+  const compressAndConvertToBase64 = async (uri: string): Promise<string> => {
+    try {
+      const compressed = await ImageManipulator.manipulateAsync(
+        uri,
+        [],
+        {
+          compress: 0.3, // Ajusta este valor según el peso final (~0.3 = 30% calidad)
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,
+        }
+      );
+      return compressed.base64!;
+    } catch (error) {
+      console.error("Error al comprimir/convertir imagen:", error);
+      throw error;
+    }
   };
 
-  const uploadImage = async () => {
+  const uploadImageAsBase64 = async () => {
     try {
       if (!image || typeof image !== 'string') {
         Alert.alert("⚠️ Imagen inválida");
@@ -44,18 +56,11 @@ const Save = () => {
         return;
       }
 
-      const blob = await uriToBlob(image);
-      console.log("Blob generado:", blob);
-      const filename = `images/${Date.now()}.jpg`;
-      const storageRef = ref(storage, filename);
-
-
-      console.log("Subiendo imagen desde URI:", image);
-      await uploadBytes(storageRef, blob);
-      const downloadURL = await getDownloadURL(storageRef);
+      console.log("🧪 Comprimendo y convirtiendo imagen...");
+      const base64Image = await compressAndConvertToBase64(image);
 
       await addDoc(collection(firestore, "feedPosts"), {
-        imageUrl: downloadURL,
+        base64Image,
         caption: caption,
         text: caption,
         createdAt: Timestamp.now(),
@@ -66,11 +71,11 @@ const Save = () => {
         comments: [],
       });
 
-      Alert.alert("✅ Publicación guardada correctamente");
+      Alert.alert("✅ Publicación guardada correctamente (base64)");
       router.back();
     } catch (error) {
-      console.error("Error al subir imagen:", error);
-      Alert.alert("❌ Error al subir la imagen");
+      console.error("❌ Error al guardar imagen:", error);
+      Alert.alert("❌ Error al guardar la imagen");
     }
   };
 
@@ -83,7 +88,7 @@ const Save = () => {
         onChangeText={setCaption}
         style={styles.input}
       />
-      <Button title="Guardar en Firebase" onPress={uploadImage} />
+      <Button title="Guardar como base64" onPress={uploadImageAsBase64} />
     </View>
   );
 };
