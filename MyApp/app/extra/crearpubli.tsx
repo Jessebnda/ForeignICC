@@ -25,7 +25,7 @@ export default function CrearPubli() {
 
       console.log("Imagen procesada:", processed.uri);
       router.push({
-        pathname: "/(tabs)/save",
+        pathname: "./save",
         params: { image: processed.uri },
       });
     }
@@ -45,7 +45,7 @@ export default function CrearPubli() {
         format: ImageManipulator.SaveFormat.JPEG,
       });
       router.push({
-        pathname: "/(tabs)/save",
+        pathname: "./save",
         params: { image: processed.uri },
       });
     } else {

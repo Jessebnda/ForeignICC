@@ -11,20 +11,30 @@ const Save = () => {
   const [caption, setCaption] = useState('');
   const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
+  const [userInfo, setUserInfo] = useState({ name: '', photo: '' });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         console.log("🟢 Usuario autenticado:", user.uid);
         setUserId(user.uid);
+  
+        // Guarda nombre y foto (URL o base64 si lo prefieres)
+        setUserInfo({
+          name: user.displayName ?? 'Usuario sin nombre',
+          photo: user.photoURL ?? '', // puedes guardar base64 si lo tienes local
+        });
+  
       } else {
         console.log("🔴 Usuario NO autenticado");
         setUserId(null);
+        setUserInfo({ name: '', photo: '' });
       }
     });
+  
     return unsubscribe;
   }, []);
-
+  
   // 🧠 Comprime y convierte la imagen a base64
   const compressAndConvertToBase64 = async (uri: string): Promise<string> => {
     try {
@@ -66,6 +76,8 @@ const Save = () => {
         createdAt: Timestamp.now(),
         location: "Culiacan",
         userId: userId,
+        userName: userInfo.name,
+        userPhoto: userInfo.photo, // puede ser base64 también
         postId: Date.now().toString(),
         likes: { [userId]: true },
         comments: [],
