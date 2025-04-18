@@ -22,12 +22,16 @@ import {
   GoogleAuthProvider,
   updateProfile 
 } from 'firebase/auth';
-import { auth } from '../firebase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage, firestore, auth } from '../firebase';
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
+
 
 // Cierra el flujo OAuth cuando regresas a la app
 WebBrowser.maybeCompleteAuthSession();
@@ -65,6 +69,28 @@ export default function LoginScreen() {
     scopes: ['profile', 'email'],
   });
 
+    //LOGICA PARA AGREGAR USUARIO A FIRESTORE
+    const createUserIfNotExists = async (user: any) => {
+      if (!user) return;
+    
+      const userRef = doc(firestore, 'users', user.uid);
+      const snapshot = await getDoc(userRef);
+    
+      if (!snapshot.exists()) {
+        const userData = {
+          uid: user.uid,
+          name: user.displayName ?? 'Usuario sin nombre',
+          photo: user.photoURL ?? '',
+          email: user.email ?? '',
+          createdAt: new Date(),
+        };
+        await setDoc(userRef, userData);
+        console.log("✅ Usuario creado en Firestore");
+      } else {
+        console.log("🔁 Usuario ya existe en Firestore");
+      }
+    };
+
   // Manejo de la respuesta de Google
   useEffect(() => {
     if (response?.type === 'success') {
@@ -73,7 +99,8 @@ export default function LoginScreen() {
         setLoading(true);
         const credential = GoogleAuthProvider.credential(id_token);
         signInWithCredential(auth, credential)
-          .then(() => {
+          .then(async(cred) => {
+            await createUserIfNotExists(cred.user);
             router.replace('./(tabs)/feed');
           })
           .catch((error) => {
@@ -110,6 +137,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      await createUserIfNotExists(auth.currentUser);
       router.replace('./(tabs)/feed');
     } catch (error: any) {
       Alert.alert('Error en Login', error.message);
@@ -145,6 +173,45 @@ export default function LoginScreen() {
     );
   };
 
+  //SUBIR FOTO base64
+  const saveCompressedProfileBase64ToFirestore = async (uri: string, uid: string) => {
+    try {
+      const compressed = await ImageManipulator.manipulateAsync(
+        uri,
+        [],
+        {
+          compress: 0.3, // 🔽 comprime la imagen
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,  // 🔄 genera base64 directamente
+        }
+      );
+  
+      const base64Image = `data:image/jpeg;base64,${compressed.base64}`;
+  
+      const userRef = doc(firestore, 'users', uid);
+      const userDoc = await getDoc(userRef);
+  
+      if (userDoc.exists()) {
+        await updateDoc(userRef, {
+          photo: base64Image,
+        });
+      } else {
+        await setDoc(userRef, {
+          uid: uid,
+          photo: base64Image,
+          name: 'Usuario sin nombre',
+          createdAt: new Date(),
+        });
+      }
+  
+      console.log('✅ Foto de perfil guardada en Firestore (base64)');
+      return true;
+    } catch (error) {
+      console.error('❌ Error al guardar la imagen base64 en Firestore:', error);
+      return false;
+    }
+  };
+
   // Registro con email
   const handleSignUp = async () => {
     if (!email.includes('@')) {
@@ -163,13 +230,20 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
+
       // Actualizar perfil del usuario con el nombre e imagen
       await updateProfile(userCredential.user, {
         displayName: name,
-        photoURL: profileImageUri || null
       });
+
+       // 2️⃣ Guarda la imagen comprimida como base64 en Firestore
+       if (profileImageUri) {
+        await saveCompressedProfileBase64ToFirestore(profileImageUri, userCredential.user.uid);
+        }
+
+      await createUserIfNotExists(userCredential.user);
       
+     
       // Guardar datos adicionales en AsyncStorage
       await saveProfileData(userCredential.user.uid);
       

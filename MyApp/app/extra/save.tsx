@@ -77,7 +77,7 @@ const Save = () => {
         location: "Culiacan",
         userId: userId,
         userName: userInfo.name,
-        userPhoto: userInfo.photo, // puede ser base64 también
+        userPhoto: userInfo.photo ?? '', // puede ser base64 también
         postId: Date.now().toString(),
         likes: { [userId]: true },
         comments: [],

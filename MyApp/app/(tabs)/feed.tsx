@@ -150,11 +150,11 @@ export default function FeedScreen() {
               id: doc.id,
               image: data.base64Image,
               user: {
-                name: data.userName,
-                image: data.userPhoto.startsWith('data:')
+                name: data.name || 'Usuario sin nombre',
+                image: data.userPhoto && data.userPhoto.startsWith('data:')
                   ? { uri: data.userPhoto }
-                  : require('../../assets/images/img7.jpg'), // fallback
-              },
+                  : require('../../assets/images/img7.jpg'),
+              },              
               content: data.caption,
               likes: data.likes ? Object.keys(data.likes).length : 0,
               comments: data.comments || [],
