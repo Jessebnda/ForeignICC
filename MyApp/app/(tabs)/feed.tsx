@@ -150,10 +150,11 @@ export default function FeedScreen() {
               id: doc.id,
               image: data.base64Image,
               user: {
-                name: data.name || 'Usuario sin nombre',
+                name: data.userName || 'Usuario sin nombre',
                 image: data.userPhoto && data.userPhoto.startsWith('data:')
                   ? { uri: data.userPhoto }
                   : require('../../assets/images/img7.jpg'),
+                  university: data.university,
               },              
               content: data.caption,
               likes: data.likes ? Object.keys(data.likes).length : 0,
@@ -257,8 +258,17 @@ const styles = StyleSheet.create({
   },
   postUserInfo: { flexDirection: 'row', alignItems: 'center' },
   postUserImage: { width: 20, height: 20, borderRadius: 10, marginRight: 6 },
-  postUserName: { color: '#fff', fontSize: 12 },
-
+  postUserName: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  postUserUniversity: {
+    color: '#fff',
+    fontSize: 12,
+    marginLeft: 4,
+    fontWeight: 'normal',
+  },
   // FAB
   fab: {
     position: 'absolute',

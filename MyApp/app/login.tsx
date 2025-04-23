@@ -31,6 +31,7 @@ import { storage, firestore, auth } from '../firebase';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { Picker } from '@react-native-picker/picker';
 
 
 // Cierra el flujo OAuth cuando regresas a la app
@@ -55,11 +56,15 @@ export default function LoginScreen() {
   const [originPlace, setOriginPlace] = useState('');
   const [profileImage, setProfileImage] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
+  const [university, setUniversity] = useState('');
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   
   // Intereses disponibles
   const availableInterests = ['deportes', 'gimnasio', 'programación', 'música', 'arte', 'viajes'];
 
+  //Universidades
+  const universidades = ['CETYS','UNAM','ITESM','UABC','IPN','Otra',];
+  
   // Configura la solicitud de autenticación para Google
   const [request, response, promptAsync] = Google.useAuthRequest({
     redirectUri: REDIRECT_URI,
@@ -70,7 +75,7 @@ export default function LoginScreen() {
   });
 
     //LOGICA PARA AGREGAR USUARIO A FIRESTORE
-    const createUserIfNotExists = async (user: any) => {
+    const createUserIfNotExists = async (user: any, name: string, university: string) => {
       if (!user) return;
     
       const userRef = doc(firestore, 'users', user.uid);
@@ -79,9 +84,10 @@ export default function LoginScreen() {
       if (!snapshot.exists()) {
         const userData = {
           uid: user.uid,
-          name: user.displayName ?? 'Usuario sin nombre',
+          name: name || user.displayName || 'Usuario sin nombre',
           photo: user.photoURL ?? '',
           email: user.email ?? '',
+          university: university || '',
           createdAt: new Date(),
         };
         await setDoc(userRef, userData);
@@ -90,7 +96,7 @@ export default function LoginScreen() {
         console.log("🔁 Usuario ya existe en Firestore");
       }
     };
-
+    
   // Manejo de la respuesta de Google
   useEffect(() => {
     if (response?.type === 'success') {
@@ -100,7 +106,7 @@ export default function LoginScreen() {
         const credential = GoogleAuthProvider.credential(id_token);
         signInWithCredential(auth, credential)
           .then(async(cred) => {
-            await createUserIfNotExists(cred.user);
+            await createUserIfNotExists(cred.user, name, university);
             router.replace('./(tabs)/feed');
           })
           .catch((error) => {
@@ -118,6 +124,7 @@ export default function LoginScreen() {
         userId,
         name: name || 'Usuario',
         origin: originPlace || 'No especificado',
+        university: university || '', 
         interests: interests.length > 0 ? interests : ['No especificado'],
         profileImage: profileImageUri || '', // Guardar URI de la imagen seleccionada
       };
@@ -136,8 +143,9 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
       await signInWithEmailAndPassword(auth, email, password);
-      await createUserIfNotExists(auth.currentUser);
+      await createUserIfNotExists(userCredential.user, name, university);
       router.replace('./(tabs)/feed');
     } catch (error: any) {
       Alert.alert('Error en Login', error.message);
@@ -214,40 +222,17 @@ export default function LoginScreen() {
 
   // Registro con email
   const handleSignUp = async () => {
-    if (!email.includes('@')) {
-      Alert.alert('Error', 'Introduce un correo electrónico válido');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Las contraseñas no coinciden');
-      return;
-    }
-    
+    if (!email.includes('@')) return Alert.alert('Error', 'Correo inválido');
+    if (password.length < 6) return Alert.alert('Error', 'Contraseña corta');
+    if (password !== confirmPassword) return Alert.alert('Error', 'No coinciden');
+
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
-      // Actualizar perfil del usuario con el nombre e imagen
-      await updateProfile(userCredential.user, {
-        displayName: name,
-      });
-
-       // 2️⃣ Guarda la imagen comprimida como base64 en Firestore
-       if (profileImageUri) {
-        await saveCompressedProfileBase64ToFirestore(profileImageUri, userCredential.user.uid);
-        }
-
-      await createUserIfNotExists(userCredential.user);
-      
-     
-      // Guardar datos adicionales en AsyncStorage
-      await saveProfileData(userCredential.user.uid);
-      
-      Alert.alert('¡Éxito!', 'Cuenta creada correctamente');
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      await createUserIfNotExists(credential.user, name, university);
+      await updateProfile(credential.user, { displayName: name });
+      if (profileImageUri) await saveCompressedProfileBase64ToFirestore(profileImageUri, credential.user.uid);
+      await saveProfileData(credential.user.uid);
       router.replace('./(tabs)/feed');
     } catch (error: any) {
       Alert.alert('Error en Registro', error.message);
@@ -307,6 +292,23 @@ export default function LoginScreen() {
       )}
     </View>
   );
+
+  const renderUniversitySelect = () => (
+    <View style={styles.inputContainer}>
+      <Ionicons name="school-outline" size={20} color="#888" style={styles.inputIcon} />
+      <Picker
+        selectedValue={university}
+        onValueChange={(itemValue) => setUniversity(itemValue)}
+        style={styles.picker}
+        dropdownIconColor="#888"
+      >
+        <Picker.Item label="Selecciona tu universidad" value="" enabled={false} />
+        {universidades.map((uni) => (
+          <Picker.Item key={uni} label={uni} value={uni} />
+        ))}
+      </Picker>
+    </View>
+  );  
 
   return (
     <KeyboardAvoidingView 
@@ -415,6 +417,7 @@ export default function LoginScreen() {
                 />
               </View>
               
+              {renderUniversitySelect()}
               {renderImagePicker()}
               
               <Text style={styles.interestsLabel}>Intereses (selecciona al menos uno):</Text>
@@ -687,4 +690,9 @@ const styles = StyleSheet.create({
     color: '#bb86fc',
     fontWeight: 'bold',
   },
+  picker: {
+    flex: 1,
+    color: '#000',
+    fontSize: 16,
+  },  
 });
