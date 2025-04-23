@@ -1,37 +1,63 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Alert, Image, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { router } from 'expo-router';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../../firebase';
 
 export default function CrearPubli() {
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const cameraRef = useRef<any>(null);
 
   const toggleCameraFacing = () => {
     setFacing((current) => (current === 'back' ? 'front' : 'back'));
   };
 
-  // Toma de foto y procesamiento
-  const takePhoto = async () => {
-    if (cameraRef.current) {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
-      const processed = await ImageManipulator.manipulateAsync(photo.uri, [], {
-        compress: 1,
-        format: ImageManipulator.SaveFormat.JPEG,
-      });
+  const uriToBlob = async (uri: string): Promise<Blob> => {
+    const response = await fetch(uri);
+    return await response.blob();
+  };
 
-      console.log("Imagen procesada:", processed.uri);
-      router.push({
-        pathname: "./save",
-        params: { image: processed.uri },
-      });
+  const uploadToFirebase = async (uri: string): Promise<string | null> => {
+    try {
+      setLoading(true);
+      const blob = await uriToBlob(uri);
+      const fileName = `images/${Date.now()}.jpg`;
+      const storageRef = ref(storage, fileName);
+      await uploadBytes(storageRef, blob);
+      const url = await getDownloadURL(storageRef);
+      setLoading(false);
+      return url;
+    } catch (err: any) {
+      setLoading(false);
+      console.log("🔥 Upload Error:", err);
+      Alert.alert('Error al subir imagen', err.message || 'Error desconocido');
+      return null;
     }
   };
 
-  // Selección desde galería y procesamiento
+  const handleImage = async (uri: string) => {
+    const processed = await ImageManipulator.manipulateAsync(uri, [], {
+      compress: 1,
+      format: ImageManipulator.SaveFormat.JPEG,
+    });
+    const url = await uploadToFirebase(processed.uri);
+    if (url) {
+      setUploadedImageUrl(url);
+    }
+  };
+
+  const takePhoto = async () => {
+    if (cameraRef.current) {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+      await handleImage(photo.uri);
+    }
+  };
+
   const pickImageFromLibrary = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -40,14 +66,7 @@ export default function CrearPubli() {
     });
 
     if (!result.canceled) {
-      const processed = await ImageManipulator.manipulateAsync(result.assets[0].uri, [], {
-        compress: 1,
-        format: ImageManipulator.SaveFormat.JPEG,
-      });
-      router.push({
-        pathname: "./save",
-        params: { image: processed.uri },
-      });
+      await handleImage(result.assets[0].uri);
     } else {
       Alert.alert('No seleccionaste ninguna imagen');
     }
@@ -66,27 +85,41 @@ export default function CrearPubli() {
   }
 
   return (
-    <View style={styles.container}>
-      <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
-        <View style={styles.controls}>
-          <TouchableOpacity onPress={toggleCameraFacing} style={styles.flipButton}>
-            <Text style={styles.text}>🔄</Text>
-          </TouchableOpacity>
+    <ScrollView contentContainerStyle={styles.scroll}>
+      <View style={styles.container}>
+        <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
+          <View style={styles.controls}>
+            <TouchableOpacity onPress={toggleCameraFacing} style={styles.flipButton}>
+              <Text style={styles.text}>🔄</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={takePhoto} style={styles.captureButton}>
-            <View style={styles.innerCircle} />
-          </TouchableOpacity>
+            <TouchableOpacity onPress={takePhoto} style={styles.captureButton}>
+              <View style={styles.innerCircle} />
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={pickImageFromLibrary} style={styles.galleryButton}>
-            <Text style={styles.text}>📁 Galería</Text>
-          </TouchableOpacity>
-        </View>
-      </CameraView>
-    </View>
+            <TouchableOpacity onPress={pickImageFromLibrary} style={styles.galleryButton}>
+              <Text style={styles.text}>📁 Galería</Text>
+            </TouchableOpacity>
+          </View>
+        </CameraView>
+
+        {loading && <Text style={styles.loadingText}>Subiendo imagen...</Text>}
+
+        {uploadedImageUrl && (
+          <View style={styles.previewContainer}>
+            <Text style={styles.text}>Imagen subida:</Text>
+            <Image source={{ uri: uploadedImageUrl }} style={styles.imagePreview} />
+          </View>
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: 'black',
@@ -105,7 +138,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   camera: {
-    flex: 1,
+    height: 500,
   },
   controls: {
     flex: 1,
@@ -147,5 +180,20 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 16,
     color: 'white',
+  },
+  loadingText: {
+    color: '#ccc',
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  previewContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  imagePreview: {
+    width: 300,
+    height: 300,
+    borderRadius: 12,
+    marginTop: 10,
   },
 });

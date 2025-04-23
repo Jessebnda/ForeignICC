@@ -5,12 +5,13 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBgTukUaL5oSSSCG0y6i-g48HwGsE5Wt4M",
+  apiKey: "AIzaSyBLVmPAr7tG27sSrMCdhfhvgaNTwlfeuqg",
   authDomain: "foreign-e6040.firebaseapp.com",
   projectId: "foreign-e6040",
-  storageBucket: "foreign-e6040.appspot.com",
+  storageBucket: "foreign-e6040.firebasestorage.app",
   messagingSenderId: "497729458678",
-  appId: "1:497729458678:web:875fe19ecc24328f2cf7d7",
+  appId: "1:497729458678:web:ae02b825dac23f612cf7d7",
+  measurementId: "G-5P62E0ZZ9Q"
 };
 
 const app = initializeApp(firebaseConfig);
