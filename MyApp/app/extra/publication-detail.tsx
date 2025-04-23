@@ -35,7 +35,14 @@ export default function PublicationDetailScreen() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        <Image source={post.image} style={styles.image} />
+          <Image 
+          source={
+            typeof post.image === 'string' && post.image.startsWith('data:')
+              ? { uri: post.image }
+              : post.image
+          } 
+          style={styles.image} 
+        />
         <View style={styles.content}>
           <View style={styles.userInfo}>
             <Image source={post.user.image} style={styles.avatar} />
