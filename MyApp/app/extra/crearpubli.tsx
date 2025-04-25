@@ -1,10 +1,14 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Alert, Image, ScrollView } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Alert, Image, ScrollView, TextInput } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase';
+import {  doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { firestore } from '../../firebase';
+
 
 export default function CrearPubli() {
   const [facing, setFacing] = useState<CameraType>('back');
@@ -12,6 +16,42 @@ export default function CrearPubli() {
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const cameraRef = useRef<any>(null);
+  const [caption, setCaption] = useState('');
+  const [location, setLocation] = useState('');
+
+
+  const savePostToFirestore = async (caption: string, location: string, imageUrl: string) => {
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+  
+    if (!currentUser || !imageUrl) {
+      Alert.alert("Faltan datos", "No se puede guardar sin imagen o usuario.");
+      return;
+    }
+  
+    const postId = Date.now().toString();
+  
+    const postData = {
+      postId,
+      caption,
+      text: caption,
+      image: imageUrl,
+      userId: currentUser.uid,
+      userName: currentUser.displayName ?? "Usuario sin nombre",
+      userPhoto: currentUser.photoURL ?? "",
+      location,
+      likes: {},
+      createdAt: serverTimestamp(),
+    };
+  
+    try {
+      await setDoc(doc(firestore, "feedPosts", postId), postData);
+      Alert.alert("✅ Publicación guardada");
+    } catch (error) {
+      console.error("❌ Error al guardar post:", error);
+      Alert.alert("Error", "No se pudo guardar la publicación.");
+    }
+  };
 
   const toggleCameraFacing = () => {
     setFacing((current) => (current === 'back' ? 'front' : 'back'));
@@ -40,17 +80,25 @@ export default function CrearPubli() {
     }
   };
 
+  const manipulateImage = async (uri: string) => {
+    return await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize: { width: 1000 } }],
+      {
+        compress: 0.6,
+        format: ImageManipulator.SaveFormat.JPEG,
+      }
+    );
+  };
+  
   const handleImage = async (uri: string) => {
-    const processed = await ImageManipulator.manipulateAsync(uri, [], {
-      compress: 1,
-      format: ImageManipulator.SaveFormat.JPEG,
-    });
+    const processed = await manipulateImage(uri);
     const url = await uploadToFirebase(processed.uri);
     if (url) {
       setUploadedImageUrl(url);
     }
   };
-
+  
   const takePhoto = async () => {
     if (cameraRef.current) {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
@@ -106,11 +154,37 @@ export default function CrearPubli() {
         {loading && <Text style={styles.loadingText}>Subiendo imagen...</Text>}
 
         {uploadedImageUrl && (
-          <View style={styles.previewContainer}>
-            <Text style={styles.text}>Imagen subida:</Text>
-            <Image source={{ uri: uploadedImageUrl }} style={styles.imagePreview} />
-          </View>
-        )}
+        <View style={styles.previewContainer}>
+          <Text style={styles.text}>Imagen subida:</Text>
+          <Image source={{ uri: uploadedImageUrl }} style={styles.imagePreview} />
+
+          <Text style={[styles.text, { marginTop: 10 }]}>Escribe un caption:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="¿Qué estás pensando?"
+            placeholderTextColor="#888"
+            onChangeText={setCaption}
+            value={caption}
+          />
+
+          <Text style={[styles.text, { marginTop: 10 }]}>Ubicación:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Ciudad"
+            placeholderTextColor="#888"
+            onChangeText={setLocation}
+            value={location}
+          />
+
+          <TouchableOpacity
+            onPress={() => savePostToFirestore(caption, location, uploadedImageUrl)}
+            style={[styles.galleryButton, { marginTop: 20 }]}
+          >
+            <Text style={styles.text}>📤 Publicar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       </View>
     </ScrollView>
   );
@@ -196,4 +270,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginTop: 10,
   },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    borderRadius: 8,
+    color: '#fff',
+    width: 300,
+    marginTop: 8,
+  },
+  
 });

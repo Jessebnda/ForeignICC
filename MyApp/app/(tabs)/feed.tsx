@@ -9,8 +9,28 @@ import {
   Text
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, deleteField, doc, updateDoc } from 'firebase/firestore';
 import { firestore } from '../../firebase';
+import 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { TextInput } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { addDoc, serverTimestamp } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+
+type Post = {
+  id: string;
+  image: string;
+  content: string;
+  user: {
+    name: string;
+    image: any;
+  };
+  likes: Record<string, boolean>;
+  comments: any[];
+};
 
 const { width } = Dimensions.get('window');
 const horizontalPadding = 16;
@@ -35,6 +55,9 @@ const weeklyEvents = [
     comments: []
   },
 ];
+
+
+
 
 function WeeklyEventsSlider() {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -75,7 +98,7 @@ function WeeklyEventsSlider() {
               <Image
                 source={
                   typeof item.image === 'string'
-                    ? { uri: `data:image/jpeg;base64,${item.image}` }
+                    ? { uri: item.image } 
                     : item.image
                 }
                 style={[styles.sliderImage, { width: sliderWidth, height: sliderWidth * 0.7 }]}
@@ -101,24 +124,125 @@ function WeeklyEventsSlider() {
 export default function FeedScreen() {
   const router = useRouter();
   const [posts, setPosts] = useState<any[]>([]);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [newComment, setNewComment] = useState('');
+  const [comments, setComments] = useState<any[]>([]);
+  const [liked, setLiked] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState('');
+  const likeCount = selectedPost?.likes ? Object.keys(selectedPost.likes).length : 0;
+
+
+  useEffect(() => {
+    const user = getAuth().currentUser;
+    if (user) {
+      setCurrentUserId(user.uid);
+    }
+  }, []);
+
+    useEffect(() => {
+      const showSub = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
+      const hideSub = Keyboard.addListener('keyboardDidHide', () => setIsKeyboardVisible(false));
+      return () => {
+        showSub.remove();
+        hideSub.remove();
+      };
+    }, []);
+
+    //likes
+    const toggleLike = async () => {
+      if (!selectedPost || !currentUserId) return;
+    
+      const postRef = doc(firestore, 'feedPosts', selectedPost.id);
+    
+      try {
+        if (liked) {
+          await updateDoc(postRef, {
+            [`likes.${currentUserId}`]: deleteField(),
+          });
+        } else {
+          await updateDoc(postRef, {
+            [`likes.${currentUserId}`]: true,
+          });
+        }
+    
+        // Actualiza UI local
+        setSelectedPost((prev) => {
+          if (!prev) return prev;
+        
+          const updatedLikes = { ...prev.likes };
+        
+          if (liked) {
+            delete updatedLikes[currentUserId];
+          } else {
+            updatedLikes[currentUserId] = true;
+          }
+        
+          return { ...prev, likes: updatedLikes };
+        });
+        setLiked(!liked);
+        
+      } catch (error) {
+        console.error('❌ Error actualizando like:', error);
+      }
+    };
 
   const goToCreatePost = () => {
     router.push({ pathname: '/extra/crearpubli' });
   };
 
-  const goToPostDetail = (item: any) => {
-    router.push({
-      pathname: '/extra/publication-detail',
-      params: { post: JSON.stringify(item) },
-    });
+  const goToPostDetail = async (item: any) => {
+  setSelectedPost(item);
+  await loadComments(item.id);
+  setLiked(!!item.likes?.[currentUserId]);
+};
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !selectedPost) return;
+
+    const comment = {
+      text: newComment.trim(),
+      created_at: serverTimestamp(),
+      user: {
+        name: 'Tú',
+        image: require('../../assets/images/img7.jpg'), // Reemplaza si tienes auth
+      },
+      likes: 0,
+    };
+
+    try {
+      await addDoc(collection(firestore, 'feedPosts', selectedPost.id, 'comments'), comment);
+      setComments((prev) => [comment, ...prev]);
+      setNewComment('');
+    } catch (error) {
+      console.error('❌ Error guardando comentario:', error);
+    }
   };
+
+  const loadComments = async (postId: string) => {
+    try {
+      const q = query(
+        collection(firestore, 'feedPosts', postId, 'comments'),
+        orderBy('created_at', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const loadedComments = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setComments(loadedComments);
+    } catch (error) {
+      console.error('❌ Error al cargar comentarios:', error);
+    }
+  };
+  
 
   const renderPost = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.postCard} onPress={() => goToPostDetail(item)}>
       <Image
         source={
           typeof item.image === 'string'
-            ? { uri: `data:image/jpeg;base64,${item.image}` }
+             ? { uri: item.image } 
             : item.image
         }
         style={styles.postImage}
@@ -148,7 +272,7 @@ export default function FeedScreen() {
             const data = doc.data();
             return {
               id: doc.id,
-              image: data.base64Image,
+              image: data.image,
               user: {
                 name: data.userName || 'Usuario sin nombre',
                 image: data.userPhoto && data.userPhoto.startsWith('data:')
@@ -184,11 +308,69 @@ export default function FeedScreen() {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
       />
+      
+        {selectedPost && (
+  <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.detailOverlay}>
 
+    <View style={styles.imageWrapper}>
+      <Image
+        source={typeof selectedPost.image === 'string' ? { uri: selectedPost.image } : selectedPost.image}
+        style={[styles.detailImage, liked && styles.likedImage]}
+        resizeMode="cover"
+      />
+
+      <TouchableOpacity onPress={toggleLike} style={styles.likeOverlayButton}>
+        <Ionicons
+          name={liked ? 'heart' : 'heart-outline'}
+          size={28}
+          color={liked ? '#f77' : '#fff'}
+        />
+      </TouchableOpacity>
+      <Text style={styles.actionText}>{likeCount}</Text>
+    </View>
+
+    <View style={styles.detailContent}>
+      <Text style={styles.detailUser}>{selectedPost.user.name}</Text>
+      <Text style={styles.detailCaption}>{selectedPost.content}</Text>
+
+      {/* Comentarios */}
+      <View style={{ width: '100%', marginTop: 16 }}>
+        {comments.map((c, i) => (
+          <View key={i} style={styles.commentBubble}>
+            <Text style={styles.commentText}>🗨 {c.text}</Text>
+          </View>
+        ))}
+        <View style={styles.commentInputRow}>
+          <TextInput
+            placeholder="Escribe un comentario..."
+            placeholderTextColor="#888"
+            value={newComment}
+            onChangeText={setNewComment}
+            style={styles.commentInput}
+          />
+          <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
+          <Ionicons name="send" size={20} color={newComment.trim() ? '#bb86fc' : '#888'} />
+        </TouchableOpacity>
+
+
+        </View>
+      </View>
+
+      <TouchableOpacity onPress={() => setSelectedPost(null)} style={styles.closeButton}>
+      <Ionicons name="arrow-back" size={24} color="#bb86fc" />
+      <Text style={styles.closeDetail}>Cerrar</Text>
+</TouchableOpacity>
+    </View>
+  </Animated.View>
+)}
+
+{!isKeyboardVisible && (     
       <TouchableOpacity style={styles.fab} onPress={goToCreatePost}>
         <Text style={styles.fabText}>＋</Text>
       </TouchableOpacity>
+      )}
     </View>
+    
   );
 }
 
@@ -291,4 +473,113 @@ const styles = StyleSheet.create({
     fontSize: 32,
     lineHeight: 34,
   },
+  detailOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    padding: 20,
+    justifyContent: 'center',
+  },
+  detailImage: {
+    width: '100%',
+    height: 240,
+    borderRadius: 16,
+    marginBottom: 16,
+  },
+  detailContent: {
+    alignItems: 'center',
+  },
+  detailUser: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 20,
+    marginBottom: 4,
+    alignSelf: 'flex-start',
+  },
+  detailCaption: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 16,
+    alignSelf: 'flex-start', // 👈 Esto alinea a la izquierda
+    textAlign: 'left',
+  },
+  
+  likeButton: {
+    marginVertical: 12,
+    backgroundColor: '#333',
+    padding: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  
+  commentInput: {
+    flex: 1,
+    backgroundColor: '#333',
+    padding: 8,
+    borderRadius: 8,
+    color: '#fff',
+    marginRight: 8,
+  },
+  
+  sendButton: {
+    color: '#bb86fc',
+    fontWeight: 'bold',
+  },
+  likedImage: {
+    borderWidth: 2,
+    borderColor: '#f77',
+  },
+  commentBubble: {
+    backgroundColor: '#1e1e1e',
+    padding: 10,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  commentText: {
+    color: '#fff',
+    fontSize: 14,
+  },  
+  imageWrapper: {
+    position: 'relative',
+    width: '100%',
+    marginBottom: 16,
+  },
+  likeOverlayButton: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 8,
+    borderRadius: 20,
+  }, 
+  closeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+    alignSelf: 'flex-start',
+  },
+  closeDetail: {
+    color: '#bb86fc',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  actionText: {
+    color: '#fff',
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  
 });
