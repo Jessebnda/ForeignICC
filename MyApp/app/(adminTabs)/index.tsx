@@ -1,161 +1,105 @@
-"use client"
+import React from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
+import { Ionicons, Feather } from '@expo/vector-icons';
 
-import { useState, useEffect, useCallback } from "react"
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
-  ActivityIndicator,
-  RefreshControl,
-} from "react-native"
-import { router } from "expo-router"
-import { FontAwesome5 } from "@expo/vector-icons"
-import { firestore } from "../../firebase"
-import { collection, query, getDocs } from "firebase/firestore"
-import * as Haptics from "expo-haptics"
-
-export default function DoctorDashboard() {
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [totalDoctors, setTotalDoctors] = useState(0)
-
-  const fetchStats = async () => {
-    try {
-      setLoading(true)
-      const q = query(collection(firestore, "doctors"))
-      const querySnapshot = await getDocs(q)
-      setTotalDoctors(querySnapshot.size)
-    } catch (error) {
-      console.error("Error fetching doctor stats:", error)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchStats()
-  }, [])
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true)
-    fetchStats()
-  }, [])
-
-  const handleNavigate = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-    // router.push("/(drawer)/(admintabs)/doctors/manage")
-  }
-
-  if (loading && !refreshing) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4f0b2e" />
-        <Text style={styles.loadingText}>Cargando gestión de doctores...</Text>
-      </View>
-    )
-  }
-
+export default function App() {
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollView}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={["#4f0b2e"]}
-            tintColor="#4f0b2e"
-            title="Actualizando..."
-            titleColor="#666"
-          />
-        }
-      >
-        <Text style={styles.title}>Gestión de Doctores</Text>
-
-        <View style={styles.card}>
-          <View style={styles.iconWrapper}>
-            <FontAwesome5 name="user-md" size={28} color="#4f0b2e" />
-          </View>
-          <Text style={styles.cardNumber}>{totalDoctors}</Text>
-          <Text style={styles.cardLabel}>Total Doctores</Text>
-        </View>
-
-        <TouchableOpacity style={styles.manageButton} onPress={handleNavigate}>
-          <Text style={styles.manageText}>Ir a Gestión de Doctores</Text>
-        </TouchableOpacity>
-      </ScrollView>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <Feather name="menu" size={24} color="#fff" style={styles.menuIcon} />
+        <Text style={styles.headerTitle}>Admin</Text>
+        <View style={styles.emptySpace} />
+      </View>
+      
+      {/* Subtitle */}
+      <Text style={styles.subtitle}>Gestión de Estudiantes</Text>
+      
+      {/* Student Count Card */}
+      <View style={styles.card}>
+        <Ionicons name="person-outline" size={28} color="#b388ff" />
+        <Text style={styles.countNumber}>0</Text>
+        <Text style={styles.countLabel}>Total de Estudiantes</Text>
+      </View>
+      
+      {/* Action Button */}
+      <TouchableOpacity style={styles.button}>
+        <Text style={styles.buttonText}>Ir a la gestión de Estudiantes</Text>
+      </TouchableOpacity>
+      
     </SafeAreaView>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: '#000',
+    paddingTop: 20,
   },
-  scrollView: {
-    padding: 16,
-    alignItems: "center",
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 10,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f8f9fa",
+  menuIcon: {
+    width: 40,
   },
-  loadingText: {
-    marginTop: 12,
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  emptySpace: {
+    width: 40,
+  },
+  subtitle: {
+    color: '#b388ff',
     fontSize: 16,
-    color: "#666",
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#4f0b2e",
-    marginBottom: 24,
+    textAlign: 'center',
+    marginBottom: 20,
   },
   card: {
-    backgroundColor: "#fff",
-    padding: 24,
-    borderRadius: 16,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    marginBottom: 24,
-    width: "100%",
+    backgroundColor: '#1a1a1a',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginVertical: 10,
   },
-  iconWrapper: {
-    backgroundColor: "#f9e6ee",
-    padding: 12,
-    borderRadius: 50,
-    marginBottom: 12,
+  countNumber: {
+    color: '#fff',
+    fontSize: 36,
+    fontWeight: 'bold',
+    marginVertical: 5,
   },
-  cardNumber: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#333",
+  countLabel: {
+    color: '#fff',
+    fontSize: 14,
   },
-  cardLabel: {
+  button: {
+    backgroundColor: '#b388ff',
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 20,
+  },
+  buttonText: {
+    color: '#000',
     fontSize: 16,
-    color: "#666",
+    fontWeight: '500',
   },
-  manageButton: {
-    backgroundColor: "#4f0b2e",
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: "center",
+  bottomIconContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
-  manageText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-})
+});

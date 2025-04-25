@@ -10,6 +10,8 @@ export default function RootLayout() {
       headerTitle: '' // This removes the title
     }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(adminTabs)" options={{ headerShown: false }} />
+
       <Stack.Screen 
         name="extra" 
         options={{ 
