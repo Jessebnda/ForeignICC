@@ -3,9 +3,13 @@ import React, { useEffect, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../firebase';
+import { TouchableOpacity, Platform, View } from 'react-native';
+import { DrawerActions, useNavigation } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 
 export default function TabsLayout() {
   const [isAnonymous, setIsAnonymous] = useState<boolean | null>(null);
+  const navigation = useNavigation();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -17,7 +21,11 @@ export default function TabsLayout() {
     return () => unsubscribe();
   }, []);
 
-  // Evita mostrar las pestañas hasta tener información del usuario
+  const openDrawer = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    navigation.dispatch(DrawerActions.openDrawer());
+  };
+
   if (isAnonymous === null) return null;
 
   return (
@@ -28,50 +36,65 @@ export default function TabsLayout() {
         tabBarStyle: { backgroundColor: '#1e1e1e', borderTopColor: '#333' },
         tabBarActiveTintColor: '#bb86fc',
         tabBarInactiveTintColor: '#888',
+        headerLeft: () => (
+          <TouchableOpacity
+            style={{
+              padding: 4,
+              marginLeft: 10,
+              backgroundColor: '#f5f5f5',
+              borderRadius: 50,
+            }}
+            onPress={openDrawer}
+          >
+            <Ionicons name="menu" size={24} color="#333" />
+          </TouchableOpacity>
+        ),
+        headerRight: () => (
+          <View style={{ marginRight: 10 }}>
+          </View>
+        ),
       }}
     >
-      <Tabs.Screen 
-        name="feed" 
+      <Tabs.Screen
+        name="feed"
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" color={color} size={size} />
           ),
         }}
       />
-      <Tabs.Screen 
-        name="map" 
+      <Tabs.Screen
+        name="map"
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="map" color={color} size={size} />
           ),
         }}
       />
-      
-          
-          
-          <Tabs.Screen 
-        name="mentor" 
+      <Tabs.Screen
+        name="mentor"
         options={{
           href: isAnonymous ? null : undefined,
           tabBarIcon: isAnonymous
             ? () => null
-            : ({ color, size }) => <Ionicons name="people" color={color} size={size} />,
+            : ({ color, size }) => (
+                <Ionicons name="people" color={color} size={size} />
+              ),
         }}
       />
-      
-      <Tabs.Screen 
-        name="forum" 
+      <Tabs.Screen
+        name="forum"
         options={{
           href: isAnonymous ? null : undefined,
           tabBarIcon: isAnonymous
             ? () => null
-            : ({ color, size }) => <Ionicons name="chatbubble" color={color} size={size} />,
+            : ({ color, size }) => (
+                <Ionicons name="chatbubble" color={color} size={size} />
+              ),
         }}
       />
-      
-
-      <Tabs.Screen 
-        name="profile" 
+      <Tabs.Screen
+        name="profile"
         options={{
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" color={color} size={size} />

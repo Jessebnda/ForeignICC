@@ -141,19 +141,37 @@ export default function LoginScreen() {
       Alert.alert('Error', 'Introduce un correo válido y una contraseña de al menos 6 caracteres.');
       return;
     }
+  
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      await signInWithEmailAndPassword(auth, email, password);
-      await createUserIfNotExists(userCredential.user, name, university);
-      router.replace('./(tabs)/feed');
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+  
+      await createUserIfNotExists(user, name, university);
+  
+      const userRef = doc(firestore, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+  
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const isAdmin = userData.isAdmin;
+        console.log('User data:', isAdmin);
+  
+        if (isAdmin) {
+          router.replace('./(adminTabs)');
+        } else {
+          router.replace('./(tabs)/feed');
+        }
+      } else {
+        Alert.alert('Error', 'No se encontró información del usuario.');
+      }
     } catch (error: any) {
       Alert.alert('Error en Login', error.message);
     } finally {
       setLoading(false);
     }
   };
-
+  
   // Login anónimo
   const handleAnonymousLogin = async () => {
     setLoading(true);
