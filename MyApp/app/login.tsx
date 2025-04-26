@@ -89,6 +89,7 @@ export default function LoginScreen() {
           email: user.email ?? '',
           university: university || '',
           createdAt: new Date(),
+          friends: [],
         };
         await setDoc(userRef, userData);
         console.log("✅ Usuario creado en Firestore");

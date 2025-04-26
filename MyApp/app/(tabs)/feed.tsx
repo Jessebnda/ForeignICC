@@ -9,7 +9,7 @@ import {
   Text
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { collection, getDocs, orderBy, query, deleteField, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, deleteField, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { firestore } from '../../firebase';
 import 'react-native-reanimated';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -19,6 +19,7 @@ import { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { addDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { ScrollView } from 'react-native';
 
 type Post = {
   id: string;
@@ -36,30 +37,8 @@ const { width } = Dimensions.get('window');
 const horizontalPadding = 16;
 const sliderWidth = width - horizontalPadding * 4;
 
-// Slider de eventos locales (puedes reemplazar luego por datos reales)
-const weeklyEvents = [
-  {
-    id: 'event1',
-    image: require('../../assets/images/img1.jpg'),
-    user: { name: 'Juan Pérez', image: require('../../assets/images/img7.jpg') },
-    content: 'Evento semanal de cultura local',
-    likes: 12,
-    comments: []
-  },
-  {
-    id: 'event2',
-    image: require('../../assets/images/img2.jpg'),
-    user: { name: 'María López', image: require('../../assets/images/img7.jpg') },
-    content: 'Exposición de arte moderno',
-    likes: 8,
-    comments: []
-  },
-];
 
-
-
-
-function WeeklyEventsSlider() {
+function WeeklyEventsSlider({ friendPosts }: { friendPosts: any[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const router = useRouter();
 
@@ -68,18 +47,21 @@ function WeeklyEventsSlider() {
     setActiveIndex(index);
   };
 
-  const goToPublicationDetail = (item: any) => {
-    router.push({
-      pathname: '/extra/publication-detail',
-      params: { post: JSON.stringify(item) },
-    });
-  };
+  //Amigos
+    const goToAmigos = () => {
+      router.push('/extra/AmigosScreen');
+    };
+
 
   return (
     <View style={[styles.sliderWrapper, { paddingHorizontal: horizontalPadding }]}>
-      <Text style={styles.sliderTitle}>Weekly Events</Text>
+      <Text style={styles.sliderTitle}>Foreign</Text>
+      
+      <TouchableOpacity onPress={goToAmigos} style={styles.friendButton}>
+              <Text style={styles.friendButtonText}>👥 Amigos</Text>
+        </TouchableOpacity>
       <FlatList
-        data={weeklyEvents}
+        data={friendPosts}
         keyExtractor={(item) => item.id}
         horizontal
         pagingEnabled
@@ -91,9 +73,10 @@ function WeeklyEventsSlider() {
         renderItem={({ item }) => (
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => goToPublicationDetail(item)}
+            //onPress={() => goToPublicationDetail(item)}
             style={{ width: sliderWidth }}
           >
+
             <View style={[styles.roundedContainer, { width: sliderWidth }]}>
               <Image
                 source={
@@ -113,7 +96,7 @@ function WeeklyEventsSlider() {
         )}
       />
       <View style={styles.pagination}>
-        {weeklyEvents.map((_, index) => (
+        {friendPosts.map((_, index) => (
           <View key={index} style={[styles.dot, activeIndex === index && styles.dotActive]} />
         ))}
       </View>
@@ -129,16 +112,35 @@ export default function FeedScreen() {
   const [comments, setComments] = useState<any[]>([]);
   const [liked, setLiked] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState('');
   const likeCount = selectedPost?.likes ? Object.keys(selectedPost.likes).length : 0;
+  const [friendPosts, setFriendPosts] = useState<any[]>([]);
+  const [universityPosts, setUniversityPosts] = useState<any[]>([]);
+  const [currentUserId, setCurrentUserId] = useState('');
+  const [currentUserData, setCurrentUserData] = useState<any>(null);
 
 
   useEffect(() => {
-    const user = getAuth().currentUser;
-    if (user) {
-      setCurrentUserId(user.uid);
-    }
+    const fetchCurrentUserData = async () => {
+      const user = getAuth().currentUser;
+      console.log('🔎 Intentando obtener usuario autenticado:', user);
+  
+      if (user) {
+        setCurrentUserId(user.uid);
+  
+        const userDoc = await getDoc(doc(firestore, 'users', user.uid));
+        console.log('📄 Documento de usuario Firestore:', userDoc.exists() ? userDoc.data() : 'No existe');
+  
+        if (userDoc.exists()) {
+          setCurrentUserData(userDoc.data());
+        }
+      } else {
+        console.log('⚠️ No hay usuario autenticado.');
+      }
+    };
+  
+    fetchCurrentUserData();
   }, []);
+  
 
     useEffect(() => {
       const showSub = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
@@ -194,7 +196,7 @@ export default function FeedScreen() {
   const goToPostDetail = async (item: any) => {
   setSelectedPost(item);
   await loadComments(item.id);
-  setLiked(!!item.likes?.[currentUserId]);
+  setLiked(!!item.likes?.[currentUserId]); 
 };
 
   const handleAddComment = async () => {
@@ -260,58 +262,107 @@ export default function FeedScreen() {
     </TouchableOpacity>
   );
 
-  // 🔄 Cargar publicaciones desde Firestore
   useFocusEffect(
     useCallback(() => {
       const fetchPosts = async () => {
+        if (!currentUserData) return;
+      
         try {
+          
           const q = query(collection(firestore, 'feedPosts'), orderBy('createdAt', 'desc'));
           const snapshot = await getDocs(q);
-
-          const loadedPosts = snapshot.docs.map((doc) => {
-            const data = doc.data();
+      
+          const loadedPosts = await Promise.all(snapshot.docs.map(async (docPost) => {
+            const data = docPost.data();
+            const userId = data.userId;
+      
+            let userData = {
+              university: undefined,
+              photo: require('../../assets/images/img7.jpg'),
+              name: 'Usuario sin nombre',
+            };
+      
+            if (userId) {
+              try {
+                const userDoc = await getDoc(doc(firestore, 'users', userId));
+                if (userDoc.exists()) {
+                  const userInfo = userDoc.data();
+                  userData = {
+                    university: userInfo.university || undefined,
+                    photo: userInfo.photo 
+                      ? (userInfo.photo.startsWith('data:') 
+                          ? { uri: userInfo.photo }
+                          : { uri: userInfo.photo })
+                      : require('../../assets/images/img7.jpg'),
+                    name: userInfo.name || 'Usuario sin nombre',
+                  };
+                }
+              } catch (error) {
+                console.error(`❌ Error cargando usuario ${userId}:`, error);
+              }
+            }
+      
             return {
-              id: doc.id,
+              id: docPost.id,
               image: data.image,
               user: {
-                name: data.userName || 'Usuario sin nombre',
-                image: data.userPhoto && data.userPhoto.startsWith('data:')
-                  ? { uri: data.userPhoto }
-                  : require('../../assets/images/img7.jpg'),
-                  university: data.university,
-              },              
+                id: userId,
+                name: userData.name,
+                image: userData.photo,
+                university: userData.university,
+              },
               content: data.caption,
               likes: data.likes ? Object.keys(data.likes).length : 0,
               comments: data.comments || [],
             };
-          });
+          }));
 
-          setPosts(loadedPosts);
+          const friendsIds = currentUserData.friends || [];
+          const myUniversity = currentUserData.university;
+      
+          const friendFiltered = loadedPosts.filter((post) => 
+            friendsIds.includes(post.user.id)
+          );
+      
+          const universityFiltered = loadedPosts.filter((post) => 
+            post.user.university === myUniversity
+          );
+          
+          console.log(friendFiltered);
+      
+          setFriendPosts(friendFiltered);
+          setUniversityPosts(universityFiltered);
+      
         } catch (error) {
           console.error('❌ Error al cargar publicaciones:', error);
         }
       };
-
+      
       fetchPosts();
-    }, [])
+    }, [currentUserData])
   );
+  
 
   return (
     <View style={{ flex: 1 }}>
       <FlatList
-        data={posts}
+        data={universityPosts}
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={styles.postRow}
         renderItem={renderPost}
-        ListHeaderComponent={<WeeklyEventsSlider />}
+        ListHeaderComponent={<WeeklyEventsSlider friendPosts={friendPosts} />}
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
       />
       
         {selectedPost && (
   <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.detailOverlay}>
-
+     <KeyboardAvoidingView
+    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    style={{ flex: 1 }}
+  >
+    <ScrollView contentContainerStyle={styles.detailScroll}>
     <View style={styles.imageWrapper}>
       <Image
         source={typeof selectedPost.image === 'string' ? { uri: selectedPost.image } : selectedPost.image}
@@ -359,8 +410,10 @@ export default function FeedScreen() {
       <TouchableOpacity onPress={() => setSelectedPost(null)} style={styles.closeButton}>
       <Ionicons name="arrow-back" size={24} color="#bb86fc" />
       <Text style={styles.closeDetail}>Cerrar</Text>
-</TouchableOpacity>
+  </TouchableOpacity>
     </View>
+    </ScrollView>
+    </KeyboardAvoidingView>
   </Animated.View>
 )}
 
@@ -580,6 +633,22 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontSize: 14,
     fontWeight: '500',
+  },
+  detailScroll: {
+    paddingBottom: 80,
+  } ,
+  friendButton: {
+    alignSelf: 'flex-end',
+    marginRight: 20,
+    marginTop: 5,
+    backgroundColor: '#4f0c2e',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+  },
+  friendButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   
 });
