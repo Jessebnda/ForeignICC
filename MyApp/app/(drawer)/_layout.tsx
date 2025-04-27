@@ -1,6 +1,6 @@
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Drawer } from "expo-router/drawer";
-import { View, Text, Pressable, StyleSheet, TouchableOpacity, Switch } from "react-native";
+import { View, Text, Pressable, StyleSheet, TouchableOpacity, Switch, Image } from "react-native";
 import { useRouter, useNavigation } from "expo-router";
 import { DrawerActions } from "@react-navigation/native";
 import * as Haptics from 'expo-haptics';
@@ -105,10 +105,9 @@ function CustomDrawerContent({ userId }: { userId: string }) {
   };
 
   const menuItems: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
-    { title: "Inicio", icon: "home", path: '/(tabs)/stackhome' },
-    { title: "Preguntas Frecuentes", icon: "frequently-asked-questions", path: '/faq' },
-    { title: "Contacto", icon: "contacts", path: '/contact' },
-    { title: "Sobre Medical Cluster SLRC", icon: "hospital-building", path: '/about' },
+    { title: "User", icon: "account", path: '/(tabs)/profile' },
+    { title: "Messages", icon: "message", path: '/(extra)/AmigosScreen' },
+    { title: "Friend request", icon: "account-plus", path: '/(extra)/AmigosScreen' },
     { title: "Configuración", icon: "cog", path: '/settings' },
   ];
 
@@ -116,30 +115,12 @@ function CustomDrawerContent({ userId }: { userId: string }) {
     <View style={styles.drawerContainer}>
       <View style={styles.titleContainer}>
         <View style={styles.headerContainer}>
-          <Text style={styles.titleText}>Menú</Text>
+        <Image 
+  source={require('../../assets/images/logo.png.jpeg')} 
+  style={styles.logoImage}
+/>
+          <Text style={styles.titleText}>Foreign</Text>
         </View>
-
-        {/* Si quieres el modo claro/oscuro futuro, aquí se reactiva */}
-        {/* <View style={styles.divider} /> 
-        <View style={styles.themeContainer}>
-          <View style={styles.themeTextContainer}>
-            <MaterialCommunityIcons 
-              name={isDarkMode ? "weather-night" : "white-balance-sunny"} 
-              size={24} 
-              color="#1a1a1a" 
-            />
-            <Text style={styles.themeText}>
-              {isDarkMode ? "Modo Oscuro" : "Modo Claro"}
-            </Text>
-          </View>
-          <Switch
-            trackColor={{ false: "#767577", true: "#f4ced4" }}
-            thumbColor={isDarkMode ? "#4f0b2e" : "#f4f3f4"}
-            ios_backgroundColor="#3e3e3e"
-            onValueChange={toggleTheme}
-            value={isDarkMode}
-          />
-        </View> */}
 
         {!isAdmin && (
           <View>
@@ -153,7 +134,7 @@ function CustomDrawerContent({ userId }: { userId: string }) {
                     router.push(item.path as any);
                   }}
                 >
-                  <MaterialCommunityIcons name={item.icon} size={24} color="#4f0b2e" />
+                  <MaterialCommunityIcons name={item.icon} size={24} color="#8B5CF6" />
                   <Text style={styles.drawerItem}>{item.title}</Text>
                 </TouchableOpacity>
                 <View style={styles.dividerItems} />
@@ -180,7 +161,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     justifyContent: "space-between",
-    backgroundColor: "white",
+    backgroundColor: "#333333",
   },
   titleContainer: {
     marginTop: 40,
@@ -193,17 +174,17 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#1a1a1a",
+    color: "#8B5CF6",
     marginLeft: 0,
   },
   divider: {
     height: 1,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "#333",
     marginVertical: 15,
   },
   dividerItems: {
     height: 1,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "#333",
     marginVertical: 15,
   },
   themeContainer: {
@@ -219,7 +200,7 @@ const styles = StyleSheet.create({
   themeText: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#1a1a1a",
+    color: "white",
     marginLeft: 15,
   },
   menuItemContainer: {
@@ -231,7 +212,7 @@ const styles = StyleSheet.create({
   drawerItem: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#1a1a1a",
+    color: "white",
     marginLeft: 15,
   },
   logoutButton: {
@@ -240,7 +221,7 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 12,
     borderRadius: 8,
-    backgroundColor: "#DC2626",
+    backgroundColor: "#EF4444",
     justifyContent: "center",
   },
   logoutButtonPressed: {
@@ -251,4 +232,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  logoImage: {
+    width: 50,   // tamaño de la imagen
+    height: 50,
+    marginRight: 8,  // separación entre la imagen y el texto "Foreign"
+    borderRadius: 8, // opcional, si quieres que esté redondeada
+  },  
 });
+
