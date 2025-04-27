@@ -7208,11 +7208,14 @@ react-native-maps@1.18.0:
   dependencies:
     "@types/geojson" "^7946.0.13"
 
+<<<<<<< Updated upstream
 "react-native-pager-view@>= 6.0.0":
   version "6.7.1"
   resolved "https://registry.npmjs.org/react-native-pager-view/-/react-native-pager-view-6.7.1.tgz"
   integrity sha512-cBSr6xw4g5N7Kd3VGWcf+kmaH7iBWb0DXAf2bVo3bXkzBcBbTOmYSvc0LVLHhUPW8nEq5WjT9LCIYAzgF++EXw==
 
+=======
+>>>>>>> Stashed changes
 react-native-reanimated@*, "react-native-reanimated@>= 2.0.0", react-native-reanimated@~3.16.1:
   version "3.16.7"
   resolved "https://registry.npmjs.org/react-native-reanimated/-/react-native-reanimated-3.16.7.tgz"

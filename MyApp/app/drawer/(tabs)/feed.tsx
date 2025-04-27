@@ -20,8 +20,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { addDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { ScrollView } from 'react-native';
-import { RefreshControl } from 'react-native';
-
 
 type Post = {
   id: string;
@@ -35,17 +33,12 @@ type Post = {
   comments: any[];
 };
 
-type WeeklyEventsSliderProps = {
-  friendPosts: any[];
-  onPressItem: (item: any) => void;
-};
-
 const { width } = Dimensions.get('window');
 const horizontalPadding = 16;
 const sliderWidth = width - horizontalPadding * 4;
 
 
-function WeeklyEventsSlider({ friendPosts, onPressItem }: WeeklyEventsSliderProps) {
+function WeeklyEventsSlider({ friendPosts }: { friendPosts: any[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const router = useRouter();
 
@@ -62,7 +55,7 @@ function WeeklyEventsSlider({ friendPosts, onPressItem }: WeeklyEventsSliderProp
 
   return (
     <View style={[styles.sliderWrapper, { paddingHorizontal: horizontalPadding }]}>
-      <Text style={styles.sliderTitle}></Text>
+      <Text style={styles.sliderTitle}>Foreign</Text>
       
       <TouchableOpacity onPress={goToAmigos} style={styles.friendButton}>
               <Text style={styles.friendButtonText}>👥 Amigos</Text>
@@ -80,7 +73,7 @@ function WeeklyEventsSlider({ friendPosts, onPressItem }: WeeklyEventsSliderProp
         renderItem={({ item }) => (
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => onPressItem(item)}
+            //onPress={() => goToPublicationDetail(item)}
             style={{ width: sliderWidth }}
           >
 
@@ -124,8 +117,6 @@ export default function FeedScreen() {
   const [universityPosts, setUniversityPosts] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState('');
   const [currentUserData, setCurrentUserData] = useState<any>(null);
-  const [refreshing, setRefreshing] = useState(false);
-
 
 
   useEffect(() => {
@@ -159,94 +150,6 @@ export default function FeedScreen() {
         hideSub.remove();
       };
     }, []);
-
-    const fetchPosts = async () => {
-      if (!currentUserData) return;
-    
-      try {
-        
-        const q = query(collection(firestore, 'feedPosts'), orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
-    
-        const loadedPosts = await Promise.all(snapshot.docs.map(async (docPost) => {
-          const data = docPost.data();
-          const userId = data.userId;
-    
-          let userData = {
-            university: undefined,
-            photo: require('../../../assets/images/img7.jpg'),
-            name: 'Usuario sin nombre',
-          };
-    
-          if (userId) {
-            try {
-              const userDoc = await getDoc(doc(firestore, 'users', userId));
-              if (userDoc.exists()) {
-                const userInfo = userDoc.data();
-                userData = {
-                  university: userInfo.university || undefined,
-                  photo: userInfo.photo 
-                    ? (userInfo.photo.startsWith('data:') 
-                        ? { uri: userInfo.photo }
-                        : { uri: userInfo.photo })
-                    : require('../../../assets/images/img7.jpg'),
-                  name: userInfo.name || 'Usuario sin nombre',
-                };
-              }
-            } catch (error) {
-              console.error(`❌ Error cargando usuario ${userId}:`, error);
-            }
-          }
-    
-          return {
-            id: docPost.id,
-            image: data.image,
-            user: {
-              id: userId,
-              name: userData.name,
-              image: userData.photo,
-              university: userData.university,
-            },
-            content: data.caption,
-            likes: data.likes ? Object.keys(data.likes).length : 0,
-            comments: data.comments || [],
-          };
-        }));
-
-        const friendsIds = currentUserData.friends || [];
-        const myUniversity = currentUserData.university;
-    
-        const friendFiltered = loadedPosts.filter((post) => 
-          friendsIds.includes(post.user.id)
-        );
-    
-        const universityFiltered = loadedPosts.filter((post) => 
-          post.user.university === myUniversity
-        );
-        
-        console.log(friendFiltered);
-    
-        setFriendPosts(friendFiltered);
-        setUniversityPosts(universityFiltered);
-    
-      } catch (error) {
-        console.error('❌ Error al cargar publicaciones:', error);
-      }
-    };
-
-    const onRefresh = async () => {
-      setRefreshing(true);
-    
-      try {
-        await fetchPosts();  // 🔥 Ya puedes usarlo aquí
-      } catch (error) {
-        console.error('Error al refrescar feed:', error);
-      } finally {
-        setTimeout(() => {
-          setRefreshing(false);
-        }, 1000);
-      }
-    };    
 
     //likes
     const toggleLike = async () => {
@@ -289,7 +192,6 @@ export default function FeedScreen() {
   const goToCreatePost = () => {
     router.push({ pathname: '/extra/crearpubli' });
   };
-  
 
   const goToPostDetail = async (item: any) => {
   setSelectedPost(item);
@@ -362,9 +264,81 @@ export default function FeedScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (currentUserData) {
-        fetchPosts();
-      }
+      const fetchPosts = async () => {
+        if (!currentUserData) return;
+      
+        try {
+          
+          const q = query(collection(firestore, 'feedPosts'), orderBy('createdAt', 'desc'));
+          const snapshot = await getDocs(q);
+      
+          const loadedPosts = await Promise.all(snapshot.docs.map(async (docPost) => {
+            const data = docPost.data();
+            const userId = data.userId;
+      
+            let userData = {
+              university: undefined,
+              photo: require('../../../assets/images/img7.jpg'),
+              name: 'Usuario sin nombre',
+            };
+      
+            if (userId) {
+              try {
+                const userDoc = await getDoc(doc(firestore, 'users', userId));
+                if (userDoc.exists()) {
+                  const userInfo = userDoc.data();
+                  userData = {
+                    university: userInfo.university || undefined,
+                    photo: userInfo.photo 
+                      ? (userInfo.photo.startsWith('data:') 
+                          ? { uri: userInfo.photo }
+                          : { uri: userInfo.photo })
+                      : require('../../../assets/images/img7.jpg'),
+                    name: userInfo.name || 'Usuario sin nombre',
+                  };
+                }
+              } catch (error) {
+                console.error(`❌ Error cargando usuario ${userId}:`, error);
+              }
+            }
+      
+            return {
+              id: docPost.id,
+              image: data.image,
+              user: {
+                id: userId,
+                name: userData.name,
+                image: userData.photo,
+                university: userData.university,
+              },
+              content: data.caption,
+              likes: data.likes ? Object.keys(data.likes).length : 0,
+              comments: data.comments || [],
+            };
+          }));
+
+          const friendsIds = currentUserData.friends || [];
+          const myUniversity = currentUserData.university;
+      
+          const friendFiltered = loadedPosts.filter((post) => 
+            friendsIds.includes(post.user.id)
+          );
+      
+          const universityFiltered = loadedPosts.filter((post) => 
+            post.user.university === myUniversity
+          );
+          
+          console.log(friendFiltered);
+      
+          setFriendPosts(friendFiltered);
+          setUniversityPosts(universityFiltered);
+      
+        } catch (error) {
+          console.error('❌ Error al cargar publicaciones:', error);
+        }
+      };
+      
+      fetchPosts();
     }, [currentUserData])
   );
   
@@ -377,12 +351,9 @@ export default function FeedScreen() {
         numColumns={2}
         columnWrapperStyle={styles.postRow}
         renderItem={renderPost}
-        ListHeaderComponent={<WeeklyEventsSlider friendPosts={friendPosts} onPressItem={goToPostDetail} />}
+        ListHeaderComponent={<WeeklyEventsSlider friendPosts={friendPosts} />}
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
       />
       
         {selectedPost && (
@@ -391,12 +362,7 @@ export default function FeedScreen() {
     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     style={{ flex: 1 }}
   >
-    <ScrollView
-  contentContainerStyle={styles.detailScroll}
-  refreshControl={
-    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
+    <ScrollView contentContainerStyle={styles.detailScroll}>
     <View style={styles.imageWrapper}>
       <Image
         source={typeof selectedPost.image === 'string' ? { uri: selectedPost.image } : selectedPost.image}

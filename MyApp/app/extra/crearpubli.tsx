@@ -8,6 +8,10 @@ import { storage } from '../../firebase';
 import {  doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { firestore } from '../../firebase';
+import { useRouter } from 'expo-router';
+import { Dimensions } from 'react-native';
+
+
 
 
 export default function CrearPubli() {
@@ -17,10 +21,12 @@ export default function CrearPubli() {
   const [loading, setLoading] = useState(false);
   const cameraRef = useRef<any>(null);
   const [caption, setCaption] = useState('');
-  const [location, setLocation] = useState('');
+  const router = useRouter();
+  const { height, width } = Dimensions.get('window');
 
 
-  const savePostToFirestore = async (caption: string, location: string, imageUrl: string) => {
+
+  const savePostToFirestore = async (caption: string, imageUrl: string) => {
     const auth = getAuth();
     const currentUser = auth.currentUser;
   
@@ -47,6 +53,7 @@ export default function CrearPubli() {
     try {
       await setDoc(doc(firestore, "feedPosts", postId), postData);
       Alert.alert("✅ Publicación guardada");
+      router.replace('/(drawer)/(tabs)/feed');
     } catch (error) {
       console.error("❌ Error al guardar post:", error);
       Alert.alert("Error", "No se pudo guardar la publicación.");
@@ -133,70 +140,76 @@ export default function CrearPubli() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
-      <View style={styles.container}>
-        <CameraView style={styles.camera} facing={facing} ref={cameraRef}>
-          <View style={styles.controls}>
+    <View style={{ flex: 1, backgroundColor: 'black' }}>
+      
+      {!uploadedImageUrl ? ( // 🔥 Si todavía NO tomaste foto
+        <>
+          <CameraView style={{ width, height }} facing={facing} ref={cameraRef} />
+  
+          {/* 🔥 Botones sobre la cámara */}
+          <View style={styles.bottomControls}>
             <TouchableOpacity onPress={toggleCameraFacing} style={styles.flipButton}>
               <Text style={styles.text}>🔄</Text>
             </TouchableOpacity>
-
+  
             <TouchableOpacity onPress={takePhoto} style={styles.captureButton}>
               <View style={styles.innerCircle} />
             </TouchableOpacity>
-
+  
             <TouchableOpacity onPress={pickImageFromLibrary} style={styles.galleryButton}>
-              <Text style={styles.text}>📁 Galería</Text>
+              <Text style={styles.text}>📁</Text>
             </TouchableOpacity>
           </View>
-        </CameraView>
-
-        {loading && <Text style={styles.loadingText}>Subiendo imagen...</Text>}
-
-        {uploadedImageUrl && (
-        <View style={styles.previewContainer}>
-          <Text style={styles.text}>Imagen subida:</Text>
-          <Image source={{ uri: uploadedImageUrl }} style={styles.imagePreview} />
-
-          <Text style={[styles.text, { marginTop: 10 }]}>Escribe un caption:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="¿Qué estás pensando?"
-            placeholderTextColor="#888"
-            onChangeText={setCaption}
-            value={caption}
-          />
-
-          <Text style={[styles.text, { marginTop: 10 }]}>Ubicación:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ciudad"
-            placeholderTextColor="#888"
-            onChangeText={setLocation}
-            value={location}
-          />
-
-          <TouchableOpacity
-            onPress={() => savePostToFirestore(caption, location, uploadedImageUrl)}
-            style={[styles.galleryButton, { marginTop: 20 }]}
-          >
-            <Text style={styles.text}>📤 Publicar</Text>
-          </TouchableOpacity>
-        </View>
+        </>
+      ) : ( // 🔥 Si ya tomaste foto
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+          <View style={styles.previewContainer}>
+            <Text style={styles.text}>Imagen subida</Text>
+            <Image source={{ uri: uploadedImageUrl }} style={styles.imagePreview} />
+  
+            <Text style={[styles.text, { marginTop: 10 }]}>Escribe un caption:</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="¿Qué estás pensando?"
+              placeholderTextColor="#888"
+              onChangeText={setCaption}
+              value={caption}
+            />
+  
+    
+  
+            <TouchableOpacity
+              onPress={() => savePostToFirestore(caption, uploadedImageUrl)}
+              style={[styles.galleryButton, { marginTop: 20 }]}
+            >
+              <Text style={styles.text}>📤 Publicar</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       )}
-
-      </View>
-    </ScrollView>
+    </View>
   );
+  
+  
 }
 
 const styles = StyleSheet.create({
+  bottomControls: {
+    position: 'absolute',
+    bottom: 40,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
   scroll: {
     flexGrow: 1,
   },
   container: {
     flex: 1,
-    backgroundColor: 'black',
+    backgroundColor: '#121212', // Fondo más elegante
+    paddingHorizontal: 16,
   },
   message: {
     textAlign: 'center',
@@ -212,31 +225,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   camera: {
-    height: 500,
+    height: 450,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 20,
   },
   controls: {
-    flex: 1,
-    flexDirection: 'column',
-    justifyContent: 'flex-end',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    paddingBottom: 40,
-  },
+    marginTop: 16, // un pequeño margen arriba de los botones
+  },  
   flipButton: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    padding: 10,
-    borderRadius: 25,
-    marginBottom: 20,
+    backgroundColor: '#4f0c2e',
+    padding: 12,
+    borderRadius: 50,
   },
   captureButton: {
     width: 70,
     height: 70,
     borderRadius: 35,
     backgroundColor: '#fff',
-    borderWidth: 4,
+    borderWidth: 3,
     borderColor: '#4f0c2e',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
   },
   innerCircle: {
     width: 40,
@@ -245,11 +258,21 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   galleryButton: {
-    marginTop: 10,
-    paddingVertical: 10,
+    backgroundColor: '#4f0c2e',
+    paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
-    backgroundColor: '#4f0c2e',
+    marginTop: 12,
+  },
+  previewContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  imagePreview: {
+    width: 320,
+    height: 320,
+    borderRadius: 16,
+    marginTop: 10,
   },
   text: {
     fontSize: 16,
@@ -260,24 +283,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
   },
-  previewContainer: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  imagePreview: {
-    width: 300,
-    height: 300,
-    borderRadius: 12,
-    marginTop: 10,
-  },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 10,
-    borderRadius: 8,
+    borderColor: '#4f0c2e',
+    backgroundColor: '#1e1e1e',
+    padding: 12,
+    borderRadius: 10,
     color: '#fff',
-    width: 300,
-    marginTop: 8,
+    width: '90%',
+    marginTop: 12,
+    fontSize: 16,
   },
-  
 });
