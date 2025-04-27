@@ -32,6 +32,8 @@ import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Picker } from '@react-native-picker/picker';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
 
 
 // Cierra el flujo OAuth cuando regresas a la app
@@ -64,7 +66,8 @@ export default function LoginScreen() {
 
   //Universidades
   const universidades = ['CETYS','UNAM','ITESM','UABC','IPN','Otra',];
-  
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
+
   // Configura la solicitud de autenticación para Google
   const [request, response, promptAsync] = Google.useAuthRequest({
     redirectUri: REDIRECT_URI,
@@ -75,7 +78,7 @@ export default function LoginScreen() {
   });
 
     //LOGICA PARA AGREGAR USUARIO A FIRESTORE
-    const createUserIfNotExists = async (user: any, name: string, university: string) => {
+    const createUserIfNotExists = async (user: any, name: string, university: string, photoURL?: string) => {
       if (!user) return;
     
       const userRef = doc(firestore, 'users', user.uid);
@@ -85,7 +88,7 @@ export default function LoginScreen() {
         const userData = {
           uid: user.uid,
           name: name || user.displayName || 'Usuario sin nombre',
-          photo: user.photoURL ?? '',
+          photo: photoURL ?? user.photoURL ?? '',
           email: user.email ?? '',
           university: university || '',
           createdAt: new Date(),
@@ -96,7 +99,7 @@ export default function LoginScreen() {
       } else {
         console.log("🔁 Usuario ya existe en Firestore");
       }
-    };
+    };    
     
   // Manejo de la respuesta de Google
   useEffect(() => {
@@ -201,58 +204,28 @@ export default function LoginScreen() {
     );
   };
 
-  //SUBIR FOTO base64
-  const saveCompressedProfileBase64ToFirestore = async (uri: string, uid: string) => {
-    try {
-      const compressed = await ImageManipulator.manipulateAsync(
-        uri,
-        [],
-        {
-          compress: 0.3, // 🔽 comprime la imagen
-          format: ImageManipulator.SaveFormat.JPEG,
-          base64: true,  // 🔄 genera base64 directamente
-        }
-      );
-  
-      const base64Image = `data:image/jpeg;base64,${compressed.base64}`;
-  
-      const userRef = doc(firestore, 'users', uid);
-      const userDoc = await getDoc(userRef);
-  
-      if (userDoc.exists()) {
-        await updateDoc(userRef, {
-          photo: base64Image,
-        });
-      } else {
-        await setDoc(userRef, {
-          uid: uid,
-          photo: base64Image,
-          name: 'Usuario sin nombre',
-          createdAt: new Date(),
-        });
-      }
-  
-      console.log('✅ Foto de perfil guardada en Firestore (base64)');
-      return true;
-    } catch (error) {
-      console.error('❌ Error al guardar la imagen base64 en Firestore:', error);
-      return false;
-    }
-  };
-
   // Registro con email
   const handleSignUp = async () => {
     if (!email.includes('@')) return Alert.alert('Error', 'Correo inválido');
     if (password.length < 6) return Alert.alert('Error', 'Contraseña corta');
     if (password !== confirmPassword) return Alert.alert('Error', 'No coinciden');
-
+  
     setLoading(true);
     try {
       const credential = await createUserWithEmailAndPassword(auth, email, password);
-      await createUserIfNotExists(credential.user, name, university);
-      await updateProfile(credential.user, { displayName: name });
-      if (profileImageUri) await saveCompressedProfileBase64ToFirestore(profileImageUri, credential.user.uid);
+  
+      
+      let photoURL: string | undefined;
+      if (profileImageUri) {
+        const uploaded = await uploadToFirebase(profileImageUri, credential.user.uid);
+        photoURL = uploaded ?? undefined; 
+      }
+  
+      await createUserIfNotExists(credential.user, name, university, photoURL);
+      await updateProfile(credential.user, { displayName: name, photoURL: photoURL ?? undefined });
+  
       await saveProfileData(credential.user.uid);
+  
       router.replace('./(drawer)/(tabs)/feed');
     } catch (error: any) {
       Alert.alert('Error en Registro', error.message);
@@ -262,27 +235,57 @@ export default function LoginScreen() {
   };
 
   // Función para seleccionar imagen de la galería
-  const pickImage = async () => {
-    // Solicitar permisos
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const pickImageFromLibrary = async () => {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
+      });
     
-    if (status !== 'granted') {
-      Alert.alert('Permiso denegado', 'Necesitamos permiso para acceder a tu galería de fotos');
-      return;
-    }
+      if (!result.canceled) {
+        setProfileImageUri(result.assets[0].uri); 
+      } else {
+        Alert.alert('No seleccionaste ninguna imagen');
+      }
+    };
+  
+
+    const uploadToFirebase = async (uri: string, uid: string): Promise<string | null> => {
+      try {
+        setLoading(true);
+        const processed = await manipulateImage(uri);
+        const blob = await uriToBlob(processed.uri);
     
-    // Abrir selector de imágenes
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
+        const fileName = `profileImages/${uid}_${Date.now()}.jpg`;
+        const storageRef = ref(storage, fileName);
     
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setProfileImageUri(result.assets[0].uri);
-    }
-  };
+        await uploadBytes(storageRef, blob);
+        const url = await getDownloadURL(storageRef);
+    
+        setLoading(false);
+        return url;
+      } catch (err: any) {
+        setLoading(false);
+        console.log("🔥 Upload Error:", err);
+        Alert.alert('Error al subir imagen', err.message || 'Error desconocido');
+        return null;
+      }
+    };
+    
+    const manipulateImage = async (uri: string) => {
+      return await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 1000 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+      );
+    };
+    
+    const uriToBlob = async (uri: string): Promise<Blob> => {
+      const response = await fetch(uri);
+      return await response.blob();
+    };
+    
+    
 
   // Renderizado de la parte de imagen en el formulario de registro
   const renderImagePicker = () => (
@@ -296,7 +299,7 @@ export default function LoginScreen() {
           />
           <TouchableOpacity 
             style={styles.changeImageButton}
-            onPress={pickImage}
+            onPress={pickImageFromLibrary}
           >
             <Text style={styles.changeImageText}>Cambiar</Text>
           </TouchableOpacity>
@@ -304,7 +307,7 @@ export default function LoginScreen() {
       ) : (
         <TouchableOpacity 
           style={styles.imagePickerButton}
-          onPress={pickImage}
+          onPress={pickImageFromLibrary}
         >
           <Ionicons name="camera" size={24} color="#fff" />
           <Text style={styles.imagePickerText}>Seleccionar imagen</Text>
