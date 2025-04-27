@@ -1,31 +1,31 @@
 // app/_layout.tsx
 import { Stack } from 'expo-router';
+import { UserProvider } from '../context/UserContext'; // Adjust path if needed
 
 export default function RootLayout() {
   return (
-    <Stack screenOptions={{
-      headerShown: false,
-      headerStyle: { backgroundColor: '#121212' },
-      headerTintColor: '#fff',
-      headerTitleStyle: { color: '#fff' },
-      headerTitle: '' // This removes the title
-    }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="(adminTabs)" options={{ headerShown: false }} />
+    // Wrap the entire app with the UserProvider
+    <UserProvider>
+      <Stack 
+        screenOptions={{
+          headerShown: false, // Hide header for the root stack by default
+        }}
+      >
+        {/* Define screens/groups managed by this stack */}
+        {/* This screen points to your main drawer navigation */}
+        <Stack.Screen name="(drawer)" /> 
+        
+        {/* This screen points to your initial loading/redirect screen */}
+        <Stack.Screen name="index" /> 
 
-      <Stack.Screen 
-        name="extra" 
-        options={{ 
-          headerShown: true,
-          headerBackTitle: '',
-        }} 
-      />
-      <Stack.Screen 
-        name="index" 
-        options={{ 
-          headerShown: false,
-        }} 
-      />
-    </Stack>
+        {/* If 'extra' screens should be presented modally over everything, 
+            you might define them here too, or handle them within (drawer) */}
+        {/* Example for modal presentation: */}
+        {/* <Stack.Screen name="extra" options={{ presentation: 'modal' }} /> */}
+
+        {/* Add other top-level screens/groups if necessary */}
+        
+      </Stack>
+    </UserProvider>
   );
 }

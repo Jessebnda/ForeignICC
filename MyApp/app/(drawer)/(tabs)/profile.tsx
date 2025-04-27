@@ -1,173 +1,604 @@
 // app/(tabs)/profile.tsx
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth } from '../../../firebase';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    Image,
+    FlatList,
+    TouchableOpacity,
+    ActivityIndicator,
+    Modal,
+    ScrollView, // <-- Ensure ScrollView is imported
+    TextInput,
+    KeyboardAvoidingView,
+    Platform,
+    RefreshControl,
+    ImageSourcePropType // Import ImageSourcePropType
+} from 'react-native';
+import { useUser } from '../../../context/UserContext';
+import { Post, Comment } from '../../../models/Post'; // Ensure these types match your data
 import { Ionicons } from '@expo/vector-icons';
+import {
+    doc,
+    collection,
+    getDocs,
+    query,
+    orderBy,
+    getDoc,
+    // Add necessary functions for modal actions if implementing them fully
+    // updateDoc, addDoc, serverTimestamp, deleteField
+} from 'firebase/firestore';
+import { firestore } from '../../../firebase';
+import { useRouter } from 'expo-router';
+
+// Default image asset
+const defaultUserImage = require('../../../assets/images/img7.jpg');
 
 export default function ProfileScreen() {
-  const router = useRouter();
-  const [profile, setProfile] = useState({
-    name: 'Cargando...',
-    origin: 'Cargando...',
-    interests: [],
-    profileImage: null,
-    publications: [],
-  });
+    const { user, userProfile, loading: loadingProfile, refreshProfile } = useUser();
+    const router = useRouter();
+    const [posts, setPosts] = useState<Post[]>([]);
+    const [loadingPosts, setLoadingPosts] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    loadUserProfile();
-  }, []);
+    // Modal State
+    const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+    const [comments, setComments] = useState<Comment[]>([]);
+    const [newComment, setNewComment] = useState('');
+    const [liked, setLiked] = useState(false);
+    const [loadingComments, setLoadingComments] = useState(false);
 
-  const loadUserProfile = async () => {
-    try {
-      const currentUser = auth.currentUser;
-      if (currentUser && currentUser.isAnonymous) {
-        // Para usuario anónimo: mostrar "Anónimo", sin intereses ni origen y con imagen default.
-        setProfile({
-          name: "Anónimo",
-          origin: "",
-          interests: [],
-          profileImage: require('../../../assets/images/default-user.png'),
-          publications: [],
+    // --- Fetch User Posts Function (Revised) ---
+    const fetchUserPosts = useCallback(async () => {
+        if (!user?.uid) {
+            setPosts([]);
+            setLoadingPosts(false);
+            return;
+        }
+
+        console.log("ProfileScreen - Fetching posts for user:", user.uid);
+        setLoadingPosts(true);
+        try {
+            const postsQuery = query(
+                collection(firestore, 'feedPosts'),
+                orderBy('createdAt', 'desc')
+            );
+            const snapshot = await getDocs(postsQuery);
+
+            const userPosts: Post[] = [];
+
+            // Process posts sequentially to avoid overwhelming Firestore reads if needed,
+            // or use Promise.all if performance is acceptable.
+            for (const docPost of snapshot.docs) {
+                const data = docPost.data();
+                const postUserId = data.userId;
+
+                // Filter for current user's posts
+                if (postUserId === user.uid) {
+                    let authorName = 'Usuario Desconocido';
+                    let authorPhoto: ImageSourcePropType = defaultUserImage;
+
+                    // Fetch author details (even though it's the current user, this ensures consistency)
+                    try {
+                        const userDocRef = doc(firestore, 'users', postUserId);
+                        const userDocSnap = await getDoc(userDocRef);
+                        if (userDocSnap.exists()) {
+                            const userInfo = userDocSnap.data();
+                            authorName = userInfo.name || 'Usuario sin nombre';
+                            // Handle photo URI correctly
+                            authorPhoto = userInfo.photo ? { uri: userInfo.photo } : defaultUserImage;
+                        }
+                    } catch (error) {
+                        console.error(`❌ Error fetching user data for post ${docPost.id}:`, error);
+                    }
+
+                    // Construct the Post object
+                    userPosts.push({
+                        id: docPost.id,
+                        userId: postUserId,
+                        imageUrl: data.image || null, // Use 'image' field from Firestore
+                        content: data.caption || '', // Use 'caption' field from Firestore
+                        userName: authorName,
+                        userPhoto: authorPhoto,
+                        likes: data.likes || {},
+                        comments: data.comments || [], // Assuming comments are stored directly
+                        createdAt: data.createdAt,
+                    });
+                }
+            }
+
+            console.log("ProfileScreen - Fetched user posts count:", userPosts.length);
+            setPosts(userPosts);
+
+        } catch (error) {
+            console.error('❌ Error fetching user posts:', error);
+            setPosts([]); // Clear posts on error
+        } finally {
+            setLoadingPosts(false);
+        }
+    }, [user]); // Depend on user object
+
+    // --- Initial Fetch & Refresh ---
+    useEffect(() => {
+        if (user) { // Fetch only if user is available
+            fetchUserPosts();
+        }
+    }, [fetchUserPosts, user]); // Add user as dependency
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        try {
+            await refreshProfile(); // Refresh context profile data
+            await fetchUserPosts(); // Re-fetch posts
+        } catch (error) {
+            console.error("Error during refresh:", error);
+        } finally {
+            setRefreshing(false);
+        }
+    }, [refreshProfile, fetchUserPosts]);
+
+    // --- Navigation ---
+    const navigateToEditProfile = () => {
+        if (!userProfile) return;
+        router.push({
+            pathname: '/extra/edit-profile',
+            // Pass necessary profile data, ensure it's serializable
+            params: { profile: JSON.stringify({
+                name: userProfile.name,
+                origin: userProfile.origin,
+                photo: userProfile.photo,
+                interests: userProfile.interests,
+                // Add other fields needed for editing
+            }) }
         });
-        return;
-      }
-
-      // Intentar cargar desde AsyncStorage para usuarios registrados
-      const userData = await AsyncStorage.getItem('userProfile');
-      
-      if (userData) {
-        const parsedData = JSON.parse(userData);
-        setProfile(prevProfile => ({
-          ...prevProfile,
-          name: parsedData.name || auth.currentUser?.displayName || 'Usuario',
-          origin: parsedData.origin || 'No especificado',
-          interests: Array.isArray(parsedData.interests) ? parsedData.interests : [],
-          profileImage: (parsedData.profileImage && parsedData.profileImage.trim() !== "")
-            ? { uri: parsedData.profileImage }
-            : auth.currentUser?.photoURL 
-              ? { uri: auth.currentUser.photoURL }
-              : require('../../../assets/images/default-user.png'),
-        }));
-      } else if (auth.currentUser) {
-        setProfile(prevProfile => ({
-          ...prevProfile,
-          name: auth.currentUser?.displayName || 'Usuario',
-          profileImage: auth.currentUser?.photoURL 
-            ? { uri: auth.currentUser.photoURL }
-            : require('../../../assets/images/default-user.png'),
-        }));
-      }
-    } catch (error) {
-      console.error('Error al cargar perfil:', error);
-      setProfile(prevProfile => ({
-        ...prevProfile,
-        name: 'Usuario',
-        origin: 'No especificado',
-        interests: [],
-        profileImage: require('../../../assets/images/default-user.png'),
-      }));
-    }
-  };
-
-  const handleEditProfile = () => {
-    router.push({
-      pathname: '../extra/edit-profile',
-      params: { profile: JSON.stringify(profile) },
-    });
-  };
-
-  const goToPublicationDetail = (publication: any) => {
-    const post = {
-      ...publication,
-      user: {
-        name: profile.name,
-        image: profile.profileImage
-      }
     };
-    
-    router.push({
-      pathname: '../extra/publication-detail',
-      params: { post: JSON.stringify(post) },
-    });
-  };
 
-  const renderPublication = ({ item }: { item: any }) => (
-    <TouchableOpacity onPress={() => goToPublicationDetail(item)}>
-      <Image source={item.image} style={styles.pubImage} />
-    </TouchableOpacity>
-  );
+    // --- Modal Handlers (Simplified Placeholders) ---
+    const handlePostPress = (post: Post) => {
+        console.log("Opening post:", post.id);
+        setSelectedPost(post);
+        // Reset/Load modal states here (likes, comments)
+        // Example: Check if current user liked this specific post
+        // setLiked(!!post.likes?.[user?.uid]);
+        // loadComments(post.id);
+    };
 
-  const renderAvatar = () => {
-    if (profile.profileImage) {
-      const source = typeof profile.profileImage === 'string' 
-        ? { uri: profile.profileImage } 
-        : profile.profileImage;
-      return <Image source={source} style={styles.avatar} />;
-    } else {
-      return (
-        <View style={[styles.avatar, { 
-          backgroundColor: '#2a2a2a', 
-          justifyContent: 'center', 
-          alignItems: 'center' 
-        }]}>
-          <Ionicons name="person" size={60} color="#888" />
-        </View>
-      );
-    }
-  };
+    const loadComments = async (postId: string) => {
+        console.log("Loading comments for:", postId);
+        setLoadingComments(true);
+        // --- Implement Firestore logic to fetch comments ---
+        // Example:
+        // try {
+        //   const commentsQuery = query(collection(firestore, 'feedPosts', postId, 'comments'), orderBy('createdAt', 'asc'));
+        //   const snapshot = await getDocs(commentsQuery);
+        //   const fetchedComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Comment));
+        //   setComments(fetchedComments);
+        // } catch (error) { console.error("Error loading comments:", error); setComments([]); }
+        // finally { setLoadingComments(false); }
+        setComments([]); // Placeholder
+        setLoadingComments(false); // Placeholder
+    };
 
-  return (
-    <View style={styles.container}>
-      {renderAvatar()}
-      <Text style={styles.name}>{profile.name}</Text>
-      {profile.origin ? <Text style={styles.origin}>{profile.origin}</Text> : null}
-      <View style={styles.interestsContainer}>
-        {profile.interests && profile.interests.length > 0 ? (
-          profile.interests.map((interest, i) => (
-            <View key={i} style={styles.chip}>
-              <Text style={styles.chipText}>{interest}</Text>
+    const handleAddComment = async () => {
+        if (!newComment.trim() || !selectedPost || !user) return;
+        console.log("Adding comment:", newComment);
+        // --- Implement Firestore logic to add comment ---
+        // Example:
+        // try {
+        //   const commentData = { userId: user.uid, text: newComment, createdAt: serverTimestamp(), userName: userProfile?.name || 'Usuario' };
+        //   await addDoc(collection(firestore, 'feedPosts', selectedPost.id, 'comments'), commentData);
+        //   setNewComment('');
+        //   await loadComments(selectedPost.id); // Refresh comments
+        // } catch (error) { console.error("Error adding comment:", error); }
+        setNewComment(''); // Placeholder
+    };
+
+    const toggleLike = async () => {
+        if (!selectedPost || !user) return;
+        console.log("Toggling like for:", selectedPost.id);
+        // --- Implement Firestore logic to update likes ---
+        // Example:
+        // const postRef = doc(firestore, 'feedPosts', selectedPost.id);
+        // const userId = user.uid;
+        // try {
+        //   await updateDoc(postRef, {
+        //     [`likes.${userId}`]: liked ? deleteField() : true // Use deleteField to remove like
+        //   });
+        //   // Update local state optimistically or after success
+        //   setLiked(!liked);
+        //   // Optionally update the likes count in selectedPost state
+        // } catch (error) { console.error("Error toggling like:", error); }
+        setLiked(!liked); // Placeholder
+    };
+
+    const closeModal = () => {
+        setSelectedPost(null);
+    };
+
+    // --- Render Logic ---
+    if (loadingProfile) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#bb86fc" />
+                <Text style={styles.loadingText}>Cargando perfil...</Text>
             </View>
-          ))
-        ) : (
-          <Text style={styles.noInterestsText}>Sin intereses seleccionados</Text>
-        )}
-      </View>
-      <TouchableOpacity style={styles.editButton} onPress={handleEditProfile}>
-        <Text style={styles.editButtonText}>Editar Perfil</Text>
-      </TouchableOpacity>
-      
-      <Text style={styles.sectionTitle}>Publicaciones</Text>
-      
-      {profile.publications && profile.publications.length > 0 ? (
-        <FlatList
-          data={profile.publications}
-          renderItem={renderPublication}
-          keyExtractor={(item, index) => item.id || `pub-${index}`}
-          numColumns={3}
-          contentContainerStyle={{ alignItems: 'center' }}
-        />
-      ) : (
-        <Text style={styles.noPublicationsText}>No hay publicaciones</Text>
-      )}
-    </View>
-  );
+        );
+    }
+
+    // Use ScrollView as the main container
+    return (
+        <ScrollView // <-- Use ScrollView here
+            style={styles.container}
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    colors={["#bb86fc"]}
+                    tintColor={"#bb86fc"}
+                />
+            }
+        >
+            {/* Profile Header */}
+            <View style={styles.profileHeader}>
+                <Image
+                    source={userProfile?.photo ? { uri: userProfile.photo } : defaultUserImage}
+                    style={styles.profileImage}
+                />
+                <Text style={styles.profileName}>{userProfile?.name || 'Usuario'}</Text>
+                <Text style={styles.profileInfo}>{userProfile?.university || 'Universidad no especificada'}</Text>
+                <TouchableOpacity style={styles.editButton} onPress={navigateToEditProfile}>
+                    <Text style={styles.editButtonText}>Editar Perfil</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Interests */}
+            <View style={styles.interestsContainer}>
+                <Text style={styles.sectionTitle}>Intereses</Text>
+                <View style={styles.interestsList}>
+                    {userProfile?.interests && userProfile.interests.length > 0 ? (
+                        userProfile.interests.map((interest: string) => (
+                            <View key={interest} style={styles.interestChip}>
+                                <Text style={styles.interestText}>{interest}</Text>
+                            </View>
+                        ))
+                    ) : (
+                        <Text style={styles.noDataText}>No hay intereses definidos.</Text>
+                    )}
+                </View>
+            </View>
+
+            {/* Posts Grid */}
+            <View style={styles.postsContainer}>
+                <Text style={styles.sectionTitle}>Mis Publicaciones</Text>
+                {loadingPosts ? (
+                    <ActivityIndicator size="small" color="#bb86fc" style={{ marginTop: 20 }} />
+                ) : (
+                    <>
+                        {posts.length > 0 ? (
+                            <FlatList
+                                data={posts}
+                                keyExtractor={item => item.id}
+                                numColumns={3}
+                                renderItem={({ item }) => (
+                                    <TouchableOpacity
+                                        style={styles.gridItem}
+                                        onPress={() => handlePostPress(item)}
+                                    >
+                                        {item.imageUrl ? (
+                                            <Image source={{ uri: item.imageUrl }} style={styles.gridImage} />
+                                        ) : (
+                                            <View style={[styles.gridImage, styles.gridPlaceholder]}>
+                                                <Ionicons name="image-outline" size={24} color="#555" />
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
+                                )}
+                                scrollEnabled={false} // Important: Disable FlatList scrolling inside ScrollView
+                            />
+                        ) : (
+                            <Text style={styles.noDataText}>No has publicado nada todavía.</Text>
+                        )}
+                    </>
+                )}
+            </View>
+
+            {/* Post Detail Modal */}
+            {selectedPost && (
+                <Modal
+                    animationType="slide"
+                    transparent={true}
+                    visible={!!selectedPost}
+                    onRequestClose={closeModal}
+                >
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === "ios" ? "padding" : "height"}
+                        style={styles.detailOverlay}
+                    >
+                        <ScrollView style={styles.detailScroll}>
+                            <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+                                <Ionicons name="close-circle" size={32} color="#aaa" />
+                            </TouchableOpacity>
+
+                            {/* Author Info (Revised Image Source) */}
+                            <View style={styles.detailAuthor}>
+                                <Image
+                                    // Check if userPhoto is already an object {uri: ...} or a number (require)
+                                    source={selectedPost.userPhoto || defaultUserImage}
+                                    style={styles.detailAuthorImage}
+                                />
+                                <Text style={styles.detailAuthorName}>{selectedPost.userName}</Text>
+                            </View>
+
+                            {/* Image */}
+                            {selectedPost.imageUrl && (
+                                <Image source={{ uri: selectedPost.imageUrl }} style={styles.detailImage} />
+                            )}
+
+                            {/* Content/Caption */}
+                            <View style={styles.detailContent}>
+                                <Text style={styles.detailCaption}>{selectedPost.content}</Text>
+
+                                {/* Like Button */}
+                                <View style={styles.detailActions}>
+                                    <TouchableOpacity onPress={toggleLike} style={styles.likeButton}>
+                                        <Ionicons
+                                            name={liked ? "heart" : "heart-outline"}
+                                            size={28}
+                                            color={liked ? "#e91e63" : "#fff"}
+                                        />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Comments Section */}
+                                <Text style={styles.sectionTitle}>Comentarios</Text>
+                                {loadingComments ? (
+                                    <ActivityIndicator color="#bb86fc" />
+                                ) : (
+                                    <>
+                                        {comments.length > 0 ? (
+                                            comments.map((comment) => (
+                                                <View key={comment.id} style={styles.commentBubble}>
+                                                    <Text style={styles.commentUser}>{comment.userName || 'Usuario'}</Text>
+                                                    <Text style={styles.commentText}>{comment.text}</Text>
+                                                </View>
+                                            ))
+                                        ) : (
+                                            <Text style={styles.noDataText}>No hay comentarios aún.</Text>
+                                        )}
+                                    </>
+                                )}
+                            </View>
+                        </ScrollView>
+
+                        {/* Comment Input */}
+                        <View style={styles.commentInputRow}>
+                            <TextInput
+                                style={styles.commentInput}
+                                placeholder="Añadir un comentario..."
+                                placeholderTextColor="#888"
+                                value={newComment}
+                                onChangeText={setNewComment}
+                            />
+                            <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
+                                <Ionicons name="send" size={24} color={newComment.trim() ? "#bb86fc" : "#888"} />
+                            </TouchableOpacity>
+                        </View>
+                    </KeyboardAvoidingView>
+                </Modal>
+            )}
+        </ScrollView> // <-- Close ScrollView here
+    );
 }
 
+// --- Styles (Keep existing styles, ensure they match the structure) ---
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212', alignItems: 'center', padding: 16 },
-  avatar: { width: 110, height: 110, borderRadius: 55, marginVertical: 12, borderWidth: 2, borderColor: '#bb86fc' },
-  name: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
-  origin: { fontSize: 16, color: '#ccc', marginBottom: 12 },
-  interestsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginVertical: 8 },
-  chip: { backgroundColor: '#1e1e1e', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, margin: 4 },
-  chipText: { color: '#fff', fontSize: 14 },
-  editButton: { backgroundColor: '#bb86fc', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 25, marginVertical: 12, elevation: 2 },
-  editButtonText: { color: '#121212', fontWeight: 'bold', fontSize: 16 },
-  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff', marginVertical: 12 },
-  pubImage: { width: 100, height: 100, margin: 4, borderRadius: 8 },
-  noInterestsText: { color: '#888', fontSize: 14, marginVertical: 8 },
-  noPublicationsText: { color: '#888', fontSize: 14, marginTop: 12 },
+    container: {
+        flex: 1,
+        backgroundColor: '#121212',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#121212',
+    },
+    loadingText: {
+        color: '#fff',
+        marginTop: 10,
+    },
+    profileHeader: {
+        alignItems: 'center',
+        paddingVertical: 24,
+        paddingHorizontal: 16,
+        backgroundColor: '#1a1a1a',
+        marginBottom: 16,
+    },
+    profileImage: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        marginBottom: 12,
+        borderWidth: 3,
+        borderColor: '#bb86fc',
+    },
+    profileName: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginBottom: 4,
+    },
+    profileInfo: {
+        fontSize: 16,
+        color: '#aaa',
+        marginBottom: 16,
+    },
+    editButton: {
+        borderColor: '#bb86fc',
+        borderWidth: 1,
+        borderRadius: 20,
+        paddingVertical: 8,
+        paddingHorizontal: 25,
+    },
+    editButtonText: {
+        color: '#bb86fc',
+        fontWeight: 'bold',
+        fontSize: 14,
+        textAlign: 'center',
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#fff',
+        marginBottom: 12,
+        paddingHorizontal: 16,
+    },
+    interestsContainer: {
+        marginBottom: 24,
+    },
+    interestsList: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        paddingHorizontal: 16,
+    },
+    interestChip: {
+        backgroundColor: '#2a2a2a',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#bb86fc',
+        marginRight: 8,
+        marginBottom: 8,
+    },
+    interestText: {
+        color: '#fff',
+        fontSize: 13,
+    },
+    noDataText: {
+        color: '#888',
+        fontStyle: 'italic',
+        textAlign: 'center',
+        marginTop: 10,
+        width: '100%',
+        paddingHorizontal: 16,
+    },
+    postsContainer: {
+        // Removed flex: 1 to let ScrollView handle height
+        paddingBottom: 20,
+    },
+    gridItem: {
+        flex: 1 / 3,
+        aspectRatio: 1,
+        padding: 1.5,
+    },
+    gridImage: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#333',
+    },
+    gridPlaceholder: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    // Modal Styles
+    detailOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.97)',
+    },
+    detailScroll: {
+        flex: 1,
+        paddingTop: Platform.OS === 'ios' ? 50 : 30,
+        paddingHorizontal: 15,
+    },
+    closeButton: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 50 : 20,
+        right: 15,
+        zIndex: 10,
+    },
+    detailAuthor: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 15,
+        paddingHorizontal: 5,
+    },
+    detailAuthorImage: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        marginRight: 10,
+        backgroundColor: '#555',
+    },
+    detailAuthorName: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    detailImage: {
+        width: '100%',
+        aspectRatio: 1,
+        borderRadius: 8,
+        marginBottom: 15,
+        backgroundColor: '#222',
+    },
+    detailContent: {
+        paddingBottom: 80, // Space for comment input
+    },
+    detailCaption: {
+        color: '#eee',
+        fontSize: 15,
+        lineHeight: 21,
+        marginBottom: 20,
+    },
+    detailActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    likeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+    },
+    commentBubble: {
+        backgroundColor: '#1e1e1e',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 10,
+    },
+    commentUser: {
+        color: '#aaa',
+        fontWeight: 'bold',
+        fontSize: 13,
+        marginBottom: 4,
+    },
+    commentText: {
+        color: '#eee',
+        fontSize: 14,
+    },
+    commentInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#333',
+        backgroundColor: '#121212',
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+    },
+    commentInput: {
+        flex: 1,
+        backgroundColor: '#2a2a2a',
+        color: '#fff',
+        paddingHorizontal: 15,
+        paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+        borderRadius: 20,
+        marginRight: 10,
+        fontSize: 15,
+    },
 });

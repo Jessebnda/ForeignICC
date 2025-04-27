@@ -78,26 +78,31 @@ export default function LoginScreen() {
   });
 
     //LOGICA PARA AGREGAR USUARIO A FIRESTORE
-    const createUserIfNotExists = async (user: any, name: string, university: string, photoURL?: string) => {
-      if (!user) return;
-    
-      const userRef = doc(firestore, 'users', user.uid);
-      const snapshot = await getDoc(userRef);
-    
-      if (!snapshot.exists()) {
-        const userData = {
-          uid: user.uid,
-          name: name || user.displayName || 'Usuario sin nombre',
-          photo: photoURL ?? user.photoURL ?? '',
-          email: user.email ?? '',
-          university: university || '',
-          createdAt: new Date(),
-          friends: [],
-        };
-        await setDoc(userRef, userData);
-        console.log("✅ Usuario creado en Firestore");
+    const createUserIfNotExists = async (user: any, name?: string, university?: string, photoURL?: string | null) => {
+      const userDocRef = doc(firestore, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (!userDocSnap.exists()) {
+        console.log("Creating new user document for:", user.uid);
+        try {
+          await setDoc(userDocRef, {
+            uid: user.uid,
+            email: user.email,
+            name: name || user.displayName || 'Usuario',
+            university: university || '',
+            photo: photoURL || user.photoURL || '', // Use passed photoURL or fallback
+            createdAt: serverTimestamp(),
+            interests: [],
+            isAdmin: false,
+            // Add other default fields as needed
+          });
+        } catch (error) {
+          console.error("Error creating user document:", error);
+        }
       } else {
-        console.log("🔁 Usuario ya existe en Firestore");
+        console.log("User document already exists for:", user.uid);
+        // Optional: Update existing document if needed (e.g., photoURL might change)
+        // await updateDoc(userDocRef, { photo: photoURL || user.photoURL || userDocSnap.data().photo || '' });
       }
     };    
     
