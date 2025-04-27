@@ -41,7 +41,7 @@ export default function TabsLayout() {
         name="feed" 
         options={{
           headerTitle: ForeignHeader,
-          title: 'Foreign',
+          title: 'Feed',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" color={color} size={size} />
           ),
@@ -64,7 +64,7 @@ export default function TabsLayout() {
         name="mentor" 
         options={{
           headerTitle: ForeignHeader,
-          title: 'Foreign',
+          title: 'Mentor',
           href: isAnonymous ? null : undefined,
           tabBarIcon: isAnonymous
             ? () => null
@@ -78,7 +78,7 @@ export default function TabsLayout() {
         name="forum" 
         options={{
           headerTitle: ForeignHeader,
-          title: 'Foreign',
+          title: 'Forum',
           href: isAnonymous ? null : undefined,
           tabBarIcon: isAnonymous
             ? () => null
@@ -92,7 +92,7 @@ export default function TabsLayout() {
         name="profile" 
         options={{
           headerTitle: ForeignHeader,
-          title: 'Foreign',
+          title: 'Profile',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" color={color} size={size} />
           ),

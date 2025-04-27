@@ -54,19 +54,11 @@ function WeeklyEventsSlider({ friendPosts, onPressItem }: WeeklyEventsSliderProp
     setActiveIndex(index);
   };
 
-  //Amigos
-    const goToAmigos = () => {
-      router.push('/extra/AmigosScreen');
-    };
-
 
   return (
     <View style={[styles.sliderWrapper, { paddingHorizontal: horizontalPadding }]}>
       <Text style={styles.sliderTitle}></Text>
       
-      <TouchableOpacity onPress={goToAmigos} style={styles.friendButton}>
-              <Text style={styles.friendButtonText}>👥 Amigos</Text>
-        </TouchableOpacity>
       <FlatList
         data={friendPosts}
         keyExtractor={(item) => item.id}
@@ -671,18 +663,5 @@ const styles = StyleSheet.create({
   detailScroll: {
     paddingBottom: 80,
   } ,
-  friendButton: {
-    alignSelf: 'flex-end',
-    marginRight: 20,
-    marginTop: 5,
-    backgroundColor: '#4f0c2e',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-  },
-  friendButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
   
 });

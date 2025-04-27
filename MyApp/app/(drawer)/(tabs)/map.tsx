@@ -14,7 +14,12 @@ import {
 } from 'react-native';
 import MapView, { Marker, LatLng } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { useMarkers, MarkerData } from '../../extra/useMarkers'; // Ajusta la ruta según tu estructura
+import { firestore } from '../../../firebase';
+import { getAuth } from 'firebase/auth';
+import { doc, getDoc, collection, getDocs, setDoc } from 'firebase/firestore';
+import { GeoPoint } from 'firebase/firestore';
+
+
 
 const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
 
@@ -26,9 +31,136 @@ export default function MapScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [manualMarkerCoords, setManualMarkerCoords] = useState<LatLng | null>(null);
   const [manualMarkerName, setManualMarkerName] = useState('');
-  const [favoriteMarkers, setFavoriteMarkers] = useState<MarkerData[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [friendIds, setFriendIds] = useState<string[]>([]);
 
+  //auth y amigos
+  useEffect(() => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+  
+    if (user) {
+      setCurrentUserId(user.uid);
+  
+      // Cargar amigos
+      const loadFriends = async () => {
+        const userRef = doc(firestore, 'users', user.uid);
+        const snapshot = await getDoc(userRef);
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setFriendIds(data.friends || []);
+        }
+      };
+  
+      loadFriends();
+    }
+  }, []);
+
+  //fetch locations
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(firestore, 'mapLocations'));
+        const loadedLocations = querySnapshot.docs
+          .map((doc) => doc.data())
+          .filter((loc) => 
+            loc.createdBy === currentUserId || friendIds.includes(loc.createdBy)
+          )
+          .map((loc) => ({
+            id: loc.locationId,
+            title: loc.title,
+            description: loc.description,
+            geoPoint: {
+              latitude: loc.geoPoint.latitude,
+              longitude: loc.geoPoint.longitude,
+            },
+            type: loc.type,
+            imageUrl: loc.imageUrl,
+            createdBy: loc.createdBy,
+          }));
+        setLocations(loadedLocations);
+      } catch (error) {
+        console.error('❌ Error cargando lugares:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  
+    if (currentUserId) {
+      fetchLocations();
+    }
+  }, [currentUserId, friendIds]);
+
+  //nuevo lugar
+  const handleLongPress = (e: any) => {
+    if (!isAddingPlace) return;
+    setManualMarkerCoords(e.nativeEvent.coordinate);
+    setModalVisible(true);
+  };
+
+  //marcador
+  const handleAddManualMarker = async () => {
+    if (!manualMarkerCoords || !manualMarkerName.trim() || !currentUserId) {
+      Alert.alert('Error', 'Completa los datos.');
+      return;
+    }
+  
+    const newId = Date.now().toString();
+  
+    const newMarker = {
+      locationId: newId,
+      title: manualMarkerName.trim(),
+      description: 'Lugar agregado manualmente',
+      geoPoint: new GeoPoint(
+        manualMarkerCoords.latitude,
+        manualMarkerCoords.longitude
+      ),
+      type: ['favoritos'],
+      imageUrl: '', // podrías agregar luego
+      createdBy: currentUserId,
+      createdAt: new Date(),
+      rating: [],
+    };
+  
+    try {
+      await setDoc(doc(firestore, 'mapLocations', newId), newMarker);
+      Alert.alert('✅ Lugar guardado en Firestore');
+  
+      // Refrescar lugares
+      setManualMarkerName('');
+      setManualMarkerCoords(null);
+      setModalVisible(false);
+      setIsAddingPlace(false);
+  
+      // Vuelve a cargar
+      const refreshed = await getDocs(collection(firestore, 'mapLocations'));
+      const loadedLocations = refreshed.docs
+        .map((doc) => doc.data())
+        .filter((loc) => loc.createdBy === currentUserId || friendIds.includes(loc.createdBy))
+        .map((loc) => ({
+          id: loc.locationId,
+          title: loc.title,
+          description: loc.description,
+          geoPoint: {
+            latitude: loc.geoPoint.latitude,
+            longitude: loc.geoPoint.longitude,
+          },
+          type: loc.type,
+          imageUrl: loc.imageUrl,
+          createdBy: loc.createdBy,
+        }));
+      setLocations(loadedLocations);
+    } catch (error) {
+      console.error('❌ Error guardando lugar:', error);
+    }
+  };
+  
+  
+  
+  
   // Ubicación del usuario
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
 
@@ -67,18 +199,36 @@ export default function MapScreen() {
     setPendingTypes(confirmedTypes);
   }, []);
 
-  // Hook personalizado para obtener marcadores (excluye "favoritos")
-  const { markers, isLoading } = useMarkers(confirmedTypes, userLocation);
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(firestore, 'mapLocations'));
+        const loadedLocations = querySnapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: data.locationId,
+            title: data.title,
+            description: data.description,
+            geoPoint: {
+              latitude: data.geoPoint.latitude,
+              longitude: data.geoPoint.longitude,
+            },
+            type: data.type,
+            imageUrl: data.imageUrl,
+          };
+        });
+        setLocations(loadedLocations);
+      } catch (error) {
+        console.error('❌ Error al cargar lugares:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  
+    fetchLocations();
+  }, []);
 
-  // Combina marcadores con favoritos si se selecciona "favoritos"
-  const markersToShow = React.useMemo(() => {
-    if (confirmedTypes.includes('favoritos')) {
-      const markerIds = new Set(markers.map(m => m.id));
-      const uniqueFavorites = favoriteMarkers.filter(m => !markerIds.has(m.id));
-      return [...markers, ...uniqueFavorites];
-    }
-    return markers;
-  }, [markers, favoriteMarkers, confirmedTypes]);
+
 
   const handleApplyFilters = () => {
     setConfirmedTypes([...pendingTypes]);
@@ -90,11 +240,11 @@ export default function MapScreen() {
     setHasChanges(true);
   };
 
-  const isFavoriteMarker = useCallback((id: string) => {
+  /*const isFavoriteMarker = useCallback((id: string) => {
     return favoriteMarkers.some(m => m.id === id);
-  }, [favoriteMarkers]);
+  }, [favoriteMarkers]);*/
 
-  const toggleFavorite = (marker: MarkerData) => {
+  /*const toggleFavorite = (marker: MarkerData) => {
     if (isFavoriteMarker(marker.id)) {
       setFavoriteMarkers(prev => prev.filter(m => m.id !== marker.id));
     } else {
@@ -106,15 +256,9 @@ export default function MapScreen() {
       };
       setFavoriteMarkers(prev => [...prev, favoriteMarker]);
     }
-  };
+  };*/
 
-  const handleLongPress = (e: any) => {
-    if (!isAddingPlace) return;
-    setManualMarkerCoords(e.nativeEvent.coordinate);
-    setModalVisible(true);
-  };
-
-  const handleAddManualMarker = () => {
+  /*const handleAddManualMarker = () => {
     if (!manualMarkerCoords || !manualMarkerName.trim()) {
       Alert.alert('Error', 'Ingresa un nombre para el marcador.');
       return;
@@ -133,7 +277,7 @@ export default function MapScreen() {
     setManualMarkerCoords(null);
     setModalVisible(false);
     setIsAddingPlace(false);
-  };
+  };*/
 
   const toggleAddingPlace = () => {
     setIsAddingPlace(prev => !prev);
@@ -183,6 +327,12 @@ export default function MapScreen() {
     }
   };
 
+  const filteredLocations = locations.filter((place) => {
+    if (confirmedTypes.length === 0) return true;
+    return place.type.some((t: string) => confirmedTypes.includes(t));
+  });
+  
+
   // ─── CONDICIONAL PARA CARGAR EL MAPA ─────────────────────────────
   // Si no se ha obtenido la ubicación (o aún se está cargando), mostramos un indicador.
   if (!userLocation) {
@@ -230,25 +380,16 @@ export default function MapScreen() {
           onPress={isRaiteActive ? handleMapPress : undefined}
         >
           {userLocation && <Marker coordinate={userLocation} title="Tú" />}
-          {markersToShow.map(marker => (
-            <Marker
-              key={marker.id}
-              coordinate={marker.coordinate}
-              title={marker.name}
-              description={marker.address}
-              pinColor={marker.pinColor || '#6200ee'}
-              onCalloutPress={() => {
-                Alert.alert(
-                  marker.name,
-                  isFavoriteMarker(marker.id) ? '¿Quitar de favoritos?' : '¿Agregar a favoritos?',
-                  [
-                    { text: 'Cancelar', style: 'cancel' },
-                    { text: isFavoriteMarker(marker.id) ? 'Quitar' : 'Agregar', onPress: () => toggleFavorite(marker) },
-                  ]
-                );
-              }}
-            />
-          ))}
+          {filteredLocations.map((place) => (
+        <Marker
+          key={place.locationId}
+          coordinate={place.geoPoint}
+          title={place.title}
+          description={place.description}
+          pinColor="#4f0c2e"
+        />
+      ))}
+
           {isRaiteActive && selectedRaitePlace && (
             <Marker coordinate={selectedRaitePlace} pinColor="orange" title="Lugar para Raite" />
           )}
@@ -292,9 +433,11 @@ export default function MapScreen() {
               }}>
                 <Text style={styles.modalButtonText}>Cancelar</Text>
               </TouchableOpacity>
+
               <TouchableOpacity style={styles.modalButton} onPress={handleAddManualMarker}>
                 <Text style={styles.modalButtonText}>Guardar</Text>
               </TouchableOpacity>
+              
             </View>
           </View>
         </View>
