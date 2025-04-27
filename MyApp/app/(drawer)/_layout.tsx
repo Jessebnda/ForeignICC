@@ -107,7 +107,7 @@ function CustomDrawerContent({ userId }: { userId: string }) {
   const menuItems: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
     { title: "User", icon: "account", path: '/(tabs)/profile' },
     { title: "Messages", icon: "message", path: '/(extra)/AmigosScreen' },
-    { title: "Friend request", icon: "account-plus", path: '/(extra)/AmigosScreen' },
+    { title: "Friend request", icon: "account-plus", path: '/extra/AmigosScreen' },
     { title: "Configuración", icon: "cog", path: '/settings' },
   ];
 

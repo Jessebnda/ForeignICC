@@ -111,11 +111,7 @@ export default function LoginScreen() {
         signInWithCredential(auth, credential)
           .then(async(cred) => {
             await createUserIfNotExists(cred.user, name, university);
-<<<<<<< Updated upstream
             router.replace('./(drawer)/(tabs)/feed');
-=======
-            router.replace('./drawer/(tabs)/feed');
->>>>>>> Stashed changes
           })
           .catch((error) => {
             Alert.alert('Error en Google Login', error.message);
@@ -166,15 +162,9 @@ export default function LoginScreen() {
         console.log('User data:', isAdmin);
   
         if (isAdmin) {
-<<<<<<< Updated upstream
           router.replace('./(drawer)/(adminTabs)');
         } else {
           router.replace('./(drawer)/(tabs)/feed');
-=======
-          router.replace('./drawer/(adminTabs)');
-        } else {
-          router.replace('./drawer/(tabs)/feed');
->>>>>>> Stashed changes
         }
       } else {
         Alert.alert('Error', 'No se encontró información del usuario.');
@@ -235,12 +225,8 @@ export default function LoginScreen() {
       await updateProfile(credential.user, { displayName: name, photoURL: photoURL ?? undefined });
   
       await saveProfileData(credential.user.uid);
-<<<<<<< Updated upstream
   
       router.replace('./(drawer)/(tabs)/feed');
-=======
-      router.replace('./drawer/(tabs)/feed');
->>>>>>> Stashed changes
     } catch (error: any) {
       Alert.alert('Error en Registro', error.message);
     } finally {

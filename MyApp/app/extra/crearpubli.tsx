@@ -45,7 +45,6 @@ export default function CrearPubli() {
       userId: currentUser.uid,
       userName: currentUser.displayName ?? "Usuario sin nombre",
       userPhoto: currentUser.photoURL ?? "",
-      location,
       likes: {},
       createdAt: serverTimestamp(),
     };

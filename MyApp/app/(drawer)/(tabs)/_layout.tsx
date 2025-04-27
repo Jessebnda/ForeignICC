@@ -48,6 +48,18 @@ export default function TabsLayout() {
         }}
       />
 
+<Tabs.Screen 
+        name="map" 
+        options={{
+          headerTitle: ForeignHeader,
+          title: 'Mapa',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="map" color={color} size={size} />
+          ),
+        }}
+      />
+
+
       <Tabs.Screen 
         name="mentor" 
         options={{
