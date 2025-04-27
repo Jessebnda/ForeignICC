@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import MentorListScreen from '../extra/mentor-list';
-import ChatbotScreen from '../extra/chatbot';
+import MentorListScreen from '../../extra/mentor-list';
+import ChatbotScreen from '../../extra/chatbot';
 
 export default function MentorScreen() {
   const [activeTab, setActiveTab] = useState<'mentores' | 'chatbot'>('mentores');

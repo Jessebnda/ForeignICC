@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../../firebase';
+import { auth } from '../../../firebase';
 
 export default function TabsLayout() {
   const [isAnonymous, setIsAnonymous] = useState<boolean | null>(null);

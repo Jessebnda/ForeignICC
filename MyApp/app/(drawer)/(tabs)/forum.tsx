@@ -3,7 +3,7 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, TextInput, Image } 
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, addDoc, query, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
-import { firestore } from '../../firebase';
+import { firestore } from '../../../firebase';
 import { getAuth } from 'firebase/auth';
 
 interface ForumUser {
@@ -62,7 +62,7 @@ export default function ForumScreen() {
     } else if (typeof source === 'string') {
       return { uri: source };
     }
-    return require('../../assets/images/img7.jpg');
+    return require('../../../assets/images/img7.jpg');
   };
 
   return (

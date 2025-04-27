@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../../firebase';
+import { auth } from '../../../firebase';
 import { TouchableOpacity, Platform, View } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
@@ -34,7 +34,7 @@ export default function TabsLayout() {
         tabBarStyle: { backgroundColor: '#1e1e1e', borderTopColor: '#333' },
         tabBarActiveTintColor: '#bb86fc',
         tabBarInactiveTintColor: '#888',
-        
+    
       }}
     >
       <Tabs.Screen

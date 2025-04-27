@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { collection, getDocs, orderBy, query, deleteField, doc, updateDoc, getDoc } from 'firebase/firestore';
-import { firestore } from '../../firebase';
+import { firestore } from '../../../firebase';
 import 'react-native-reanimated';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { TextInput } from 'react-native';
@@ -207,7 +207,7 @@ export default function FeedScreen() {
       created_at: serverTimestamp(),
       user: {
         name: 'Tú',
-        image: require('../../assets/images/img7.jpg'), // Reemplaza si tienes auth
+        image: require('../../../assets/images/img7.jpg'), // Reemplaza si tienes auth
       },
       likes: 0,
     };
@@ -253,7 +253,7 @@ export default function FeedScreen() {
       <View style={styles.postOverlay}>
         <View style={styles.postUserInfo}>
           <Image
-            source={item.user.image || require('../../assets/images/img7.jpg')}
+            source={item.user.image || require('../../../assets/images/img7.jpg')}
             style={styles.postUserImage}
           />
           <Text style={styles.postUserName}>{item.user.name}</Text>
@@ -278,7 +278,7 @@ export default function FeedScreen() {
       
             let userData = {
               university: undefined,
-              photo: require('../../assets/images/img7.jpg'),
+              photo: require('../../../assets/images/img7.jpg'),
               name: 'Usuario sin nombre',
             };
       
@@ -293,7 +293,7 @@ export default function FeedScreen() {
                       ? (userInfo.photo.startsWith('data:') 
                           ? { uri: userInfo.photo }
                           : { uri: userInfo.photo })
-                      : require('../../assets/images/img7.jpg'),
+                      : require('../../../assets/images/img7.jpg'),
                     name: userInfo.name || 'Usuario sin nombre',
                   };
                 }

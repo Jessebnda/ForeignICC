@@ -108,7 +108,7 @@ export default function LoginScreen() {
         signInWithCredential(auth, credential)
           .then(async(cred) => {
             await createUserIfNotExists(cred.user, name, university);
-            router.replace('./(tabs)/feed');
+            router.replace('./(drawer)/(tabs)/feed');
           })
           .catch((error) => {
             Alert.alert('Error en Google Login', error.message);
@@ -159,9 +159,9 @@ export default function LoginScreen() {
         console.log('User data:', isAdmin);
   
         if (isAdmin) {
-          router.replace('./(adminTabs)');
+          router.replace('./(drawer)/(adminTabs)');
         } else {
-          router.replace('./(tabs)/feed');
+          router.replace('./(drawer)/(tabs)/feed');
         }
       } else {
         Alert.alert('Error', 'No se encontró información del usuario.');
@@ -176,9 +176,10 @@ export default function LoginScreen() {
   // Login anónimo
   const handleAnonymousLogin = async () => {
     setLoading(true);
+    console.log('Iniciando sesión anónima...');
     try {
       await signInAnonymously(auth);
-      router.replace('./(tabs)/feed');
+      router.replace('./(drawer)/(tabs)/feed');
     } catch (error: any) {
       Alert.alert('Error en Login Anónimo', error.message);
     } finally {
@@ -252,7 +253,7 @@ export default function LoginScreen() {
       await updateProfile(credential.user, { displayName: name });
       if (profileImageUri) await saveCompressedProfileBase64ToFirestore(profileImageUri, credential.user.uid);
       await saveProfileData(credential.user.uid);
-      router.replace('./(tabs)/feed');
+      router.replace('./(drawer)/(tabs)/feed');
     } catch (error: any) {
       Alert.alert('Error en Registro', error.message);
     } finally {
