@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../../firebase';
+import { Text, View } from 'react-native';
 
 export default function TabsLayout() {
   const [isAnonymous, setIsAnonymous] = useState<boolean | null>(null);
@@ -13,12 +14,18 @@ export default function TabsLayout() {
         setIsAnonymous(user.isAnonymous);
       }
     });
-
     return () => unsubscribe();
   }, []);
 
-  // Evita mostrar las pestañas hasta tener información del usuario
   if (isAnonymous === null) return null;
+
+  const ForeignHeader = () => (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 22, fontStyle: 'italic', color: 'white', fontWeight: 'bold' }}>
+        Foreign
+      </Text>
+    </View>
+  );
 
   return (
     <Tabs
@@ -33,46 +40,47 @@ export default function TabsLayout() {
       <Tabs.Screen 
         name="feed" 
         options={{
+          headerTitle: ForeignHeader,
+          title: 'Foreign',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" color={color} size={size} />
           ),
         }}
       />
+
       <Tabs.Screen 
-        name="map" 
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map" color={color} size={size} />
-          ),
-        }}
-      />
-      
-          
-          
-          <Tabs.Screen 
         name="mentor" 
         options={{
+          headerTitle: ForeignHeader,
+          title: 'Foreign',
           href: isAnonymous ? null : undefined,
           tabBarIcon: isAnonymous
             ? () => null
-            : ({ color, size }) => <Ionicons name="people" color={color} size={size} />,
+            : ({ color, size }) => (
+                <Ionicons name="people" color={color} size={size} />
+              ),
         }}
       />
-      
+
       <Tabs.Screen 
         name="forum" 
         options={{
+          headerTitle: ForeignHeader,
+          title: 'Foreign',
           href: isAnonymous ? null : undefined,
           tabBarIcon: isAnonymous
             ? () => null
-            : ({ color, size }) => <Ionicons name="chatbubble" color={color} size={size} />,
+            : ({ color, size }) => (
+                <Ionicons name="chatbubble" color={color} size={size} />
+              ),
         }}
       />
-      
 
       <Tabs.Screen 
         name="profile" 
         options={{
+          headerTitle: ForeignHeader,
+          title: 'Foreign',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" color={color} size={size} />
           ),
