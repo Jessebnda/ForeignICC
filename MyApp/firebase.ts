@@ -19,5 +19,10 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const firestore = getFirestore(app);
 export const storage = getStorage(app);
-
+export const getCurrentUserToken = async () => {
+  const user = auth.currentUser;
+  if (!user) return null;
+  
+  return await user.getIdToken(true);
+};
 export default app;

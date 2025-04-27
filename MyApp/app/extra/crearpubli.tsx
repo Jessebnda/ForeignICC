@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase';
-import {  doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import {  doc, setDoc, serverTimestamp, updateDoc, arrayUnion } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { firestore } from '../../firebase';
 
@@ -23,14 +23,14 @@ export default function CrearPubli() {
   const savePostToFirestore = async (caption: string, location: string, imageUrl: string) => {
     const auth = getAuth();
     const currentUser = auth.currentUser;
-  
+
     if (!currentUser || !imageUrl) {
       Alert.alert("Faltan datos", "No se puede guardar sin imagen o usuario.");
       return;
     }
-  
+
     const postId = Date.now().toString();
-  
+
     const postData = {
       postId,
       caption,
@@ -41,11 +41,20 @@ export default function CrearPubli() {
       userPhoto: currentUser.photoURL ?? "",
       location,
       likes: {},
+      comments: [],
       createdAt: serverTimestamp(),
     };
-  
+
     try {
+      // Guarda el post en la colección feedPosts
       await setDoc(doc(firestore, "feedPosts", postId), postData);
+      
+      // Actualiza las referencias del usuario
+      const userRef = doc(firestore, "users", currentUser.uid);
+      await updateDoc(userRef, {
+        posts: arrayUnion(postId)
+      });
+      
       Alert.alert("✅ Publicación guardada");
     } catch (error) {
       console.error("❌ Error al guardar post:", error);

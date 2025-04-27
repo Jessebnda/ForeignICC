@@ -78,21 +78,23 @@ export default function LoginScreen() {
   });
 
     //LOGICA PARA AGREGAR USUARIO A FIRESTORE
-    const createUserIfNotExists = async (user: any, name: string, university: string, photoURL?: string) => {
+    const createUserIfNotExists = async (user: any, name: string, university: string) => {
       if (!user) return;
-    
+
       const userRef = doc(firestore, 'users', user.uid);
       const snapshot = await getDoc(userRef);
-    
+
       if (!snapshot.exists()) {
         const userData = {
           uid: user.uid,
           name: name || user.displayName || 'Usuario sin nombre',
-          photo: photoURL ?? user.photoURL ?? '',
+          photo: user.photoURL ?? '',
           email: user.email ?? '',
           university: university || '',
+          interests: interests.length > 0 ? interests : [],
           createdAt: new Date(),
           friends: [],
+          posts: [] // Para referencias a posts
         };
         await setDoc(userRef, userData);
         console.log("✅ Usuario creado en Firestore");
