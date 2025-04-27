@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth } from '../../firebase';
+import { auth } from '../../../firebase';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ProfileScreen() {
@@ -29,7 +29,7 @@ export default function ProfileScreen() {
           name: "Anónimo",
           origin: "",
           interests: [],
-          profileImage: require('../../assets/images/default-user.png'),
+          profileImage: require('../../../assets/images/default-user.png'),
           publications: [],
         });
         return;
@@ -49,7 +49,7 @@ export default function ProfileScreen() {
             ? { uri: parsedData.profileImage }
             : auth.currentUser?.photoURL 
               ? { uri: auth.currentUser.photoURL }
-              : require('../../assets/images/default-user.png'),
+              : require('../../../assets/images/default-user.png'),
         }));
       } else if (auth.currentUser) {
         setProfile(prevProfile => ({
@@ -57,7 +57,7 @@ export default function ProfileScreen() {
           name: auth.currentUser?.displayName || 'Usuario',
           profileImage: auth.currentUser?.photoURL 
             ? { uri: auth.currentUser.photoURL }
-            : require('../../assets/images/default-user.png'),
+            : require('../../../assets/images/default-user.png'),
         }));
       }
     } catch (error) {
@@ -67,7 +67,7 @@ export default function ProfileScreen() {
         name: 'Usuario',
         origin: 'No especificado',
         interests: [],
-        profileImage: require('../../assets/images/default-user.png'),
+        profileImage: require('../../../assets/images/default-user.png'),
       }));
     }
   };

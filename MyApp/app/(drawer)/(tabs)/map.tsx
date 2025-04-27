@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import MapView, { Marker, LatLng } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { useMarkers, MarkerData } from '../extra/useMarkers'; // Ajusta la ruta según tu estructura
+import { useMarkers, MarkerData } from '../../extra/useMarkers'; // Ajusta la ruta según tu estructura
 
 const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
 

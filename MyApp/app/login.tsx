@@ -22,12 +22,17 @@ import {
   GoogleAuthProvider,
   updateProfile 
 } from 'firebase/auth';
-import { auth } from '../firebase';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage, firestore, auth } from '../firebase';
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { Picker } from '@react-native-picker/picker';
+
 
 // Cierra el flujo OAuth cuando regresas a la app
 WebBrowser.maybeCompleteAuthSession();
@@ -51,11 +56,15 @@ export default function LoginScreen() {
   const [originPlace, setOriginPlace] = useState('');
   const [profileImage, setProfileImage] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
+  const [university, setUniversity] = useState('');
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   
   // Intereses disponibles
   const availableInterests = ['deportes', 'gimnasio', 'programación', 'música', 'arte', 'viajes'];
 
+  //Universidades
+  const universidades = ['CETYS','UNAM','ITESM','UABC','IPN','Otra',];
+  
   // Configura la solicitud de autenticación para Google
   const [request, response, promptAsync] = Google.useAuthRequest({
     redirectUri: REDIRECT_URI,
@@ -65,6 +74,30 @@ export default function LoginScreen() {
     scopes: ['profile', 'email'],
   });
 
+    //LOGICA PARA AGREGAR USUARIO A FIRESTORE
+    const createUserIfNotExists = async (user: any, name: string, university: string) => {
+      if (!user) return;
+    
+      const userRef = doc(firestore, 'users', user.uid);
+      const snapshot = await getDoc(userRef);
+    
+      if (!snapshot.exists()) {
+        const userData = {
+          uid: user.uid,
+          name: name || user.displayName || 'Usuario sin nombre',
+          photo: user.photoURL ?? '',
+          email: user.email ?? '',
+          university: university || '',
+          createdAt: new Date(),
+          friends: [],
+        };
+        await setDoc(userRef, userData);
+        console.log("✅ Usuario creado en Firestore");
+      } else {
+        console.log("🔁 Usuario ya existe en Firestore");
+      }
+    };
+    
   // Manejo de la respuesta de Google
   useEffect(() => {
     if (response?.type === 'success') {
@@ -73,8 +106,9 @@ export default function LoginScreen() {
         setLoading(true);
         const credential = GoogleAuthProvider.credential(id_token);
         signInWithCredential(auth, credential)
-          .then(() => {
-            router.replace('./(tabs)/feed');
+          .then(async(cred) => {
+            await createUserIfNotExists(cred.user, name, university);
+            router.replace('./(drawer)/(tabs)/feed');
           })
           .catch((error) => {
             Alert.alert('Error en Google Login', error.message);
@@ -91,6 +125,7 @@ export default function LoginScreen() {
         userId,
         name: name || 'Usuario',
         origin: originPlace || 'No especificado',
+        university: university || '', 
         interests: interests.length > 0 ? interests : ['No especificado'],
         profileImage: profileImageUri || '', // Guardar URI de la imagen seleccionada
       };
@@ -107,23 +142,44 @@ export default function LoginScreen() {
       Alert.alert('Error', 'Introduce un correo válido y una contraseña de al menos 6 caracteres.');
       return;
     }
+  
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.replace('./(tabs)/feed');
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+  
+      await createUserIfNotExists(user, name, university);
+  
+      const userRef = doc(firestore, 'users', user.uid);
+      const userSnap = await getDoc(userRef);
+  
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const isAdmin = userData.isAdmin;
+        console.log('User data:', isAdmin);
+  
+        if (isAdmin) {
+          router.replace('./(drawer)/(adminTabs)');
+        } else {
+          router.replace('./(drawer)/(tabs)/feed');
+        }
+      } else {
+        Alert.alert('Error', 'No se encontró información del usuario.');
+      }
     } catch (error: any) {
       Alert.alert('Error en Login', error.message);
     } finally {
       setLoading(false);
     }
   };
-
+  
   // Login anónimo
   const handleAnonymousLogin = async () => {
     setLoading(true);
+    console.log('Iniciando sesión anónima...');
     try {
       await signInAnonymously(auth);
-      router.replace('./(tabs)/feed');
+      router.replace('./(drawer)/(tabs)/feed');
     } catch (error: any) {
       Alert.alert('Error en Login Anónimo', error.message);
     } finally {
@@ -145,36 +201,59 @@ export default function LoginScreen() {
     );
   };
 
+  //SUBIR FOTO base64
+  const saveCompressedProfileBase64ToFirestore = async (uri: string, uid: string) => {
+    try {
+      const compressed = await ImageManipulator.manipulateAsync(
+        uri,
+        [],
+        {
+          compress: 0.3, // 🔽 comprime la imagen
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,  // 🔄 genera base64 directamente
+        }
+      );
+  
+      const base64Image = `data:image/jpeg;base64,${compressed.base64}`;
+  
+      const userRef = doc(firestore, 'users', uid);
+      const userDoc = await getDoc(userRef);
+  
+      if (userDoc.exists()) {
+        await updateDoc(userRef, {
+          photo: base64Image,
+        });
+      } else {
+        await setDoc(userRef, {
+          uid: uid,
+          photo: base64Image,
+          name: 'Usuario sin nombre',
+          createdAt: new Date(),
+        });
+      }
+  
+      console.log('✅ Foto de perfil guardada en Firestore (base64)');
+      return true;
+    } catch (error) {
+      console.error('❌ Error al guardar la imagen base64 en Firestore:', error);
+      return false;
+    }
+  };
+
   // Registro con email
   const handleSignUp = async () => {
-    if (!email.includes('@')) {
-      Alert.alert('Error', 'Introduce un correo electrónico válido');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Las contraseñas no coinciden');
-      return;
-    }
-    
+    if (!email.includes('@')) return Alert.alert('Error', 'Correo inválido');
+    if (password.length < 6) return Alert.alert('Error', 'Contraseña corta');
+    if (password !== confirmPassword) return Alert.alert('Error', 'No coinciden');
+
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Actualizar perfil del usuario con el nombre e imagen
-      await updateProfile(userCredential.user, {
-        displayName: name,
-        photoURL: profileImageUri || null
-      });
-      
-      // Guardar datos adicionales en AsyncStorage
-      await saveProfileData(userCredential.user.uid);
-      
-      Alert.alert('¡Éxito!', 'Cuenta creada correctamente');
-      router.replace('./(tabs)/feed');
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      await createUserIfNotExists(credential.user, name, university);
+      await updateProfile(credential.user, { displayName: name });
+      if (profileImageUri) await saveCompressedProfileBase64ToFirestore(profileImageUri, credential.user.uid);
+      await saveProfileData(credential.user.uid);
+      router.replace('./(drawer)/(tabs)/feed');
     } catch (error: any) {
       Alert.alert('Error en Registro', error.message);
     } finally {
@@ -233,6 +312,23 @@ export default function LoginScreen() {
       )}
     </View>
   );
+
+  const renderUniversitySelect = () => (
+    <View style={styles.inputContainer}>
+      <Ionicons name="school-outline" size={20} color="#888" style={styles.inputIcon} />
+      <Picker
+        selectedValue={university}
+        onValueChange={(itemValue) => setUniversity(itemValue)}
+        style={styles.picker}
+        dropdownIconColor="#888"
+      >
+        <Picker.Item label="Selecciona tu universidad" value="" enabled={false} />
+        {universidades.map((uni) => (
+          <Picker.Item key={uni} label={uni} value={uni} />
+        ))}
+      </Picker>
+    </View>
+  );  
 
   return (
     <KeyboardAvoidingView 
@@ -341,6 +437,7 @@ export default function LoginScreen() {
                 />
               </View>
               
+              {renderUniversitySelect()}
               {renderImagePicker()}
               
               <Text style={styles.interestsLabel}>Intereses (selecciona al menos uno):</Text>
@@ -613,4 +710,9 @@ const styles = StyleSheet.create({
     color: '#bb86fc',
     fontWeight: 'bold',
   },
+  picker: {
+    flex: 1,
+    color: '#000',
+    fontSize: 16,
+  },  
 });

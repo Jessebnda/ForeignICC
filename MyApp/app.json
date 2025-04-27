@@ -8,18 +8,21 @@
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "owner": "foreign-project",
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "bundleIdentifier": "com.foreign.app", // Aquí pones el que quieras usar
-      "client-id":"497729458678-oovq36fgcgdm6ho6unb5rql4gg30cupn.apps.googleusercontent.com",
-      "supportsTablet": true
+      "bundleIdentifier": "com.foreign.app",
+      "client-id": "497729458678-oovq36fgcgdm6ho6unb5rql4gg30cupn.apps.googleusercontent.com",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      
       "package": "com.foreign.app",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {

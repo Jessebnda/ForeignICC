@@ -1,105 +1,85 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Image } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Image } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { addDoc, collection, onSnapshot, query, orderBy, Timestamp } from 'firebase/firestore';
+import { firestore } from '../../firebase';
+import { getAuth } from 'firebase/auth';
+
+interface ForumUser {
+  name: string;
+  image: string;
+}
+
+interface ForumAnswer {
+  id: string;
+  content: string;
+  timestamp: any;
+  user: ForumUser;
+}
 
 export default function QuestionDetailScreen() {
-  const router = useRouter();
-  const { question: questionParam } = useLocalSearchParams();
-
-  // Parsear el parámetro y asegurar que las propiedades necesarias tengan valores por defecto
-  let parsedQuestion = questionParam ? JSON.parse(questionParam as string) : {};
-  parsedQuestion.title = parsedQuestion.title || '';
-  parsedQuestion.answers = parsedQuestion.answers || [];
-  parsedQuestion.timestamp = parsedQuestion.timestamp || 'Hace 2 horas';
-  // Si no se proporcionó usuario, se asigna un valor por defecto
-  parsedQuestion.user = parsedQuestion.user || { 
-    name: 'Usuario', 
-    image: require('../../assets/images/img7.jpg') 
-  };
-
-  const question = parsedQuestion;
-  const [answers, setAnswers] = useState<any[]>(question.answers);
+  const { question } = useLocalSearchParams();
+  const parsedQuestion = question ? JSON.parse(question as string) : null;
+  const [answers, setAnswers] = useState<ForumAnswer[]>([]);
   const [newAnswer, setNewAnswer] = useState('');
+  const auth = getAuth();
+  const user = auth.currentUser;
 
-  const addAnswer = () => {
-    if (!newAnswer.trim()) return;
+  useEffect(() => {
+    if (!parsedQuestion?.id) return;
+    const q = query(
+      collection(firestore, 'forumQuestions', parsedQuestion.id, 'answers'),
+      orderBy('timestamp', 'desc')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetched = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as ForumAnswer[];
+      setAnswers(fetched);
+    });
+    return () => unsubscribe();
+  }, [parsedQuestion?.id]);
+
+  const sendAnswer = async () => {
+    if (!newAnswer.trim() || !user) return;
     const answer = {
-      id: `ans-${Date.now()}`,
       content: newAnswer.trim(),
-      comments: [],
-      user: { name: 'Tú', image: require('../../assets/images/img7.jpg') },
-      timestamp: 'Ahora',
-      likes: 0,
+      timestamp: Timestamp.now(),
+      user: {
+        name: user.displayName || 'Usuario sin nombre',
+        image: user.photoURL || '',
+      },
     };
-    setAnswers([answer, ...answers]);
+    await addDoc(collection(firestore, 'forumQuestions', parsedQuestion.id, 'answers'), answer);
     setNewAnswer('');
   };
 
-  const goToAnswerDetail = (answer: any) => {
-    router.push({
-      pathname: '../extra/answer-detail',
-      params: { answer: JSON.stringify(answer) },
-    });
+  const renderAvatar = (source: string) => {
+    if (source.startsWith('data:')) return { uri: source };
+    if (source) return { uri: source };
+    return require('../../assets/images/img7.jpg');
   };
-
-  const renderAnswer = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.card} onPress={() => goToAnswerDetail(item)}>
-      <View style={styles.answerHeader}>
-        <View style={styles.userInfo}>
-          <Image source={item.user.image} style={styles.avatar} />
-          <View>
-            <Text style={styles.userName}>{item.user.name}</Text>
-            <Text style={styles.timestamp}>{item.timestamp}</Text>
-          </View>
-        </View>
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-horizontal" size={20} color="#888" />
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.answerContent}>{item.content}</Text>
-      <View style={styles.answerFooter}>
-        <View style={styles.stats}>
-          <TouchableOpacity style={styles.statButton}>
-            <Ionicons name="heart-outline" size={16} color="#888" />
-            <Text style={styles.statText}>{item.likes}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.statButton}>
-            <Ionicons name="chatbubble-outline" size={16} color="#888" />
-            <Text style={styles.statText}>{item.comments.length}</Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity style={styles.respondButton}>
-          <Text style={styles.respondText}>Responder</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
 
   return (
     <View style={styles.container}>
-      <View style={styles.questionHeader}>
-        <View style={styles.userInfo}>
-          <Image source={question.user.image} style={styles.avatar} />
-          <View>
-            <Text style={styles.userName}>{question.user.name}</Text>
-            <Text style={styles.timestamp}>{question.timestamp}</Text>
-          </View>
-        </View>
-        <Text style={styles.questionTitle}>{question.title}</Text>
-      </View>
-
+      <Text style={styles.title}>{parsedQuestion?.title}</Text>
       <FlatList
         data={answers}
         keyExtractor={(item) => item.id}
-        renderItem={renderAnswer}
-        contentContainerStyle={styles.listContent}
+        renderItem={({ item }) => (
+          <View style={styles.answerCard}>
+            <Image source={renderAvatar(item.user.image)} style={styles.avatar} />
+            <View style={styles.answerContent}>
+              <Text style={styles.userName}>{item.user.name}</Text>
+              <Text style={styles.timestamp}>{new Date(item.timestamp?.toDate?.()).toLocaleString()}</Text>
+              <Text style={styles.answerText}>{item.content}</Text>
+            </View>
+          </View>
+        )}
       />
-
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          placeholder="Escribe tu respuesta..."
+          placeholder="Escribe una respuesta..."
           placeholderTextColor="#888"
           value={newAnswer}
           onChangeText={setNewAnswer}
@@ -107,7 +87,7 @@ export default function QuestionDetailScreen() {
         />
         <TouchableOpacity 
           style={[styles.sendButton, !newAnswer.trim() && styles.sendButtonDisabled]} 
-          onPress={addAnswer}
+          onPress={sendAnswer}
           disabled={!newAnswer.trim()}
         >
           <Ionicons name="send" size={20} color={newAnswer.trim() ? '#fff' : '#888'} />
@@ -118,54 +98,46 @@ export default function QuestionDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  questionHeader: {
-    padding: 16,
-    borderBottomWidth: 1,
+  container: { flex: 1, padding: 16, backgroundColor: '#121212' },
+  title: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginBottom: 16 },
+  answerCard: {
+    flexDirection: 'row',
+    backgroundColor: '#1e1e1e',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 12, borderWidth: 2, borderColor: '#bb86fc' },
+  answerContent: { flex: 1 },
+  userName: { color: '#fff', fontWeight: 'bold' },
+  timestamp: { fontSize: 12, color: '#888', marginBottom: 4 },
+  answerText: { color: '#fff', lineHeight: 20 },
+  inputContainer: {
+    flexDirection: 'row',
+    padding: 12,
+    borderTopWidth: 1,
     borderColor: '#333',
     backgroundColor: '#1e1e1e',
   },
-  userInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 12, borderWidth: 2, borderColor: '#bb86fc' },
-  userName: { fontSize: 16, fontWeight: 'bold', color: '#fff' },
-  timestamp: { fontSize: 12, color: '#888', marginTop: 2 },
-  questionTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff', marginTop: 8 },
-  listContent: { padding: 16 },
-  card: {
-    backgroundColor: '#1e1e1e',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 1,
+  input: {
+    flex: 1,
+    backgroundColor: '#333',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    color: '#fff',
+    marginRight: 8,
+    maxHeight: 100,
   },
-  answerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  answerContent: { fontSize: 16, color: '#fff', lineHeight: 24, marginBottom: 12 },
-  answerFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#bb86fc',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  stats: { flexDirection: 'row', alignItems: 'center' },
-  statButton: { flexDirection: 'row', alignItems: 'center', marginRight: 16 },
-  statText: { color: '#888', marginLeft: 4, fontSize: 14 },
-  respondButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, backgroundColor: '#333' },
-  respondText: { color: '#bb86fc', fontSize: 14 },
-  inputContainer: { flexDirection: 'row', padding: 12, borderTopWidth: 1, borderColor: '#333', backgroundColor: '#1e1e1e' },
-  input: { flex: 1, backgroundColor: '#333', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, color: '#fff', marginRight: 8, maxHeight: 100 },
-  sendButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#bb86fc', justifyContent: 'center', alignItems: 'center' },
-  sendButtonDisabled: { backgroundColor: '#333' },
-
-
-  moreButton: {
-    padding: 8,
-    // Ajusta los estilos que necesites
-    // por ejemplo:
-    // backgroundColor: '#333',
-    // borderRadius: 4,
-  }
+  sendButtonDisabled: {
+    backgroundColor: '#333',
+  },
 });
