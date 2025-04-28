@@ -33,6 +33,8 @@ import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Picker } from '@react-native-picker/picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { serverTimestamp as firebaseServerTimestamp } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 
 
@@ -52,6 +54,45 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingPersistence, setLoadingPersistence] = useState(false);
+
+
+  useEffect(() => {
+    setLoadingPersistence(true);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user?.isAnonymous ) {
+        console.log("Usuario anónimo logueado:", user.uid);
+        router.replace('/(drawer)/(tabs)/feed');
+        setLoadingPersistence(false);
+      }
+      if (user) {
+        console.log("Usuario logueado:", user.uid);
+        const userRef = doc(firestore, 'users', user.uid);
+        getDoc(userRef).then((userDoc) => {
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            const isAdmin = userData.isAdmin;
+            setLoadingPersistence(false);
+            if (isAdmin) {
+              router.replace('/(drawer)/(adminTabs)');
+            } else {
+              router.replace('/(drawer)/(tabs)/feed');
+            }
+          } else {
+            console.log("No se encontró información del usuario.");
+            setLoading(false);
+          }
+        });
+      } else {
+        setLoadingPersistence(false);
+
+        console.log("Usuario no logueado");
+      }
+    });
+  
+    return () => unsubscribe();
+  }, []);
+  
   
   // Nuevos estados para información de perfil
   const [name, setName] = useState('');
@@ -165,12 +206,12 @@ export default function LoginScreen() {
         const userData = userSnap.data();
         const isAdmin = userData.isAdmin;
         console.log('User data:', isAdmin);
-  
-        if (isAdmin) {
-          router.replace('./(drawer)/(adminTabs)');
-        } else {
-          router.replace('./(drawer)/(tabs)/feed');
-        }
+        //Ya no es necesario esto, pues lo carga desde el useEffect del principio del authchange
+        // if (isAdmin) {
+        //   router.replace('./(drawer)/(adminTabs)');
+        // } else {
+        //   router.replace('./(drawer)/(tabs)/feed');
+        // }
       } else {
         Alert.alert('Error', 'No se encontró información del usuario.');
       }
@@ -337,6 +378,15 @@ export default function LoginScreen() {
       </Picker>
     </View>
   );  
+
+  if (loadingPersistence) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#bb86fc" />
+        <Text style={styles.loaderText}>Cargando...</Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView 
@@ -535,6 +585,17 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: '#121212',
   },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#121212',
+  },
+  loaderText: {
+    marginTop: 10,
+    color: '#fff',
+    fontSize: 16,
+  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -724,3 +785,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },  
 });
+function serverTimestamp(): any {
+  return firebaseServerTimestamp();
+}

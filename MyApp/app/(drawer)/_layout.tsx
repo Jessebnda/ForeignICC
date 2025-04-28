@@ -111,6 +111,14 @@ function CustomDrawerContent({ userId }: { userId: string }) {
     { title: "Configuración", icon: "cog", path: '/settings' },
   ];
 
+  const menuItemsAdmin: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
+    { title: "User", icon: "account", path: '/(tabs)/profile' },
+    { title: "Messages", icon: "message", path: '/(extra)/AmigosScreen' },
+    { title: "Friend request", icon: "account-plus", path: '/extra/AmigosScreen' },
+    { title: "Configuración", icon: "cog", path: '/settings' },
+    { title: "Dashboard", icon: "powershell", path: '/(adminTabs)' },
+  ];
+
   return (
     <View style={styles.drawerContainer}>
       <View style={styles.titleContainer}>
@@ -122,10 +130,30 @@ function CustomDrawerContent({ userId }: { userId: string }) {
           <Text style={styles.titleText}>Foreign</Text>
         </View>
 
-        {!isAdmin && (
+        {!isAdmin ? (
           <View>
             <View style={styles.divider} />
             {menuItems.map((item, index) => (
+              <View key={index}>
+                <TouchableOpacity 
+                  style={styles.menuItemContainer}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push(item.path as any);
+                  }}
+                >
+                  <MaterialCommunityIcons name={item.icon} size={24} color="#8B5CF6" />
+                  <Text style={styles.drawerItem}>{item.title}</Text>
+                </TouchableOpacity>
+                <View style={styles.dividerItems} />
+              </View>
+            ))}
+          </View>
+        ) : 
+        (
+          <View>
+            <View style={styles.divider} />
+            {menuItemsAdmin.map((item, index) => (
               <View key={index}>
                 <TouchableOpacity 
                   style={styles.menuItemContainer}
