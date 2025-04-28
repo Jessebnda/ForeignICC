@@ -44,11 +44,9 @@ export default function StackHome() {
         name="gestionUsuarios"
         options={{
           headerTitle: "Gestión de Usuarios",
-          // No headerLeft aquí, así no sale el icono
         }}
       />
 
-      {/* Agrega más pantallas aquí, todas sin headerLeft a menos que lo especifiques */}
     </Stack>
   );
 }

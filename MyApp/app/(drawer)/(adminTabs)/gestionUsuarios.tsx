@@ -11,14 +11,15 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
-  Image
+  Image,
+  ScrollView
 } from 'react-native';
-import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
-import { collection, getDocs, doc, deleteDoc, query, where, orderBy } from 'firebase/firestore';
-import { firestore } from '../../../firebase'; // Using your existing Firebase config
+import { Ionicons, Feather, MaterialIcons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
+import { collection, getDocs, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { firestore } from '../../../firebase';
 
 //@ts-ignore
-export default function UserManagementScreen({ navigation }) {
+export default function ManagementScreen({ navigation }) {
   interface User {
     id: string;
     name?: string;
@@ -27,149 +28,490 @@ export default function UserManagementScreen({ navigation }) {
     photoURL?: string;
   }
 
-  const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  interface Mentor {
+    id: string;
+    name?: string;
+    specialty?: string;
+    photoURL?: string;
+  }
+
+  interface Post {
+    id: string;
+    caption?: string;
+    text?: string;
+    image?: string;
+    userId?: string;
+    userName?: string;
+    userPhoto?: string;
+    location?: string;
+    createdAt?: any;
+    likes?: Record<string, boolean>;
+  }
+
+  interface Location {
+    id: string;
+    title?: string;
+    description?: string;
+    geoPoint?: {
+      latitude: number;
+      longitude: number;
+    };
+    imageUrl?: string;
+    imageUrls?: string[];
+    type?: string[];
+    createdAt?: any;
+    createdBy?: string;
+  }
+
+  interface Forum {
+    id: string;
+    title?: string;
+    question?: string;
+    authorId?: string;
+    authorName?: string;
+    createdAt?: any;
+  }
+
+  type DataItem = User | Mentor | Post | Location | Forum;
+
+  // Category configuration
+  const categories = [
+    { 
+      id: 'users', 
+      name: 'Estudiantes', 
+      collection: 'users',
+      icon: <Ionicons name="person-outline" size={24} color="#b388ff" />
+    },
+    { 
+      id: 'mentors', 
+      name: 'Mentores', 
+      collection: 'mentors',
+      icon: <FontAwesome5 name="chalkboard-teacher" size={22} color="#b388ff" />
+    },
+    { 
+      id: 'posts', 
+      name: 'Posts', 
+      collection: 'feedPosts',
+      icon: <MaterialCommunityIcons name="post-outline" size={24} color="#b388ff" />
+    },
+    { 
+      id: 'locations', 
+      name: 'Ubicaciones', 
+      collection: 'mapLocations',
+      icon: <MaterialIcons name="location-on" size={24} color="#b388ff" />
+    },
+    { 
+      id: 'forums', 
+      name: 'Foros', 
+      collection: 'forumQuestions',
+      icon: <MaterialCommunityIcons name="forum-outline" size={24} color="#b388ff" />
+    }
+  ];
+
+  const [activeCategory, setActiveCategory] = useState(categories[0]);
+  const [items, setItems] = useState<DataItem[]>([]);
+  const [filteredItems, setFilteredItems] = useState<DataItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // 'asc' or 'desc'
-  const [sortBy, setSortBy] = useState('name'); // 'name', 'email', 'createdAt'
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState('name'); // Default sort field
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    fetchItems();
+  }, [activeCategory]);
 
   useEffect(() => {
     if (searchQuery.trim() === '') {
-      setFilteredUsers(users);
+      setFilteredItems(items);
     } else {
       const lowercasedQuery = searchQuery.toLowerCase();
-      const filtered = users.filter(
-        user => 
-          user.name?.toLowerCase().includes(lowercasedQuery) || 
-          user.email?.toLowerCase().includes(lowercasedQuery)
-      );
-      setFilteredUsers(filtered);
+      const filtered = items.filter(item => {
+        // Different search fields based on category
+        switch(activeCategory.id) {
+          case 'users':
+            return (item as User).name?.toLowerCase().includes(lowercasedQuery) || 
+                   (item as User).email?.toLowerCase().includes(lowercasedQuery);
+          case 'mentors':
+            return (item as Mentor).name?.toLowerCase().includes(lowercasedQuery) || 
+                   (item as Mentor).specialty?.toLowerCase().includes(lowercasedQuery);
+          case 'posts':
+            return (item as Post).caption?.toLowerCase().includes(lowercasedQuery) || 
+                   (item as Post).text?.toLowerCase().includes(lowercasedQuery) ||
+                   (item as Post).userName?.toLowerCase().includes(lowercasedQuery);
+          case 'locations':
+            return (item as Location).title?.toLowerCase().includes(lowercasedQuery) || 
+                   (item as Location).description?.toLowerCase().includes(lowercasedQuery);
+          case 'forums':
+            return (item as Forum).title?.toLowerCase().includes(lowercasedQuery) || 
+                   (item as Forum).question?.toLowerCase().includes(lowercasedQuery);
+          default:
+            return false;
+        }
+      });
+      setFilteredItems(filtered);
     }
-  }, [searchQuery, users]);
+  }, [searchQuery, items, activeCategory]);
 
-  const fetchUsers = async () => {
+  const fetchItems = async () => {
     try {
       setLoading(true);
+      setSearchQuery('');
+      
+      // Get appropriate sort field based on category
+      let sortField = getSortFieldForCategory();
       
       // Create a query with sorting
-      const usersRef = collection(firestore, 'users');
-      const q = query(usersRef, orderBy(sortBy, sortOrder));
+      const itemsRef = collection(firestore, activeCategory.collection);
+      const q = query(itemsRef, orderBy(sortField, sortOrder));
       
       const querySnapshot = await getDocs(q);
-      const usersList: User[] = [];
+      const itemsList: DataItem[] = [];
       
       querySnapshot.forEach((doc) => {
-        usersList.push({
+        itemsList.push({
           id: doc.id,
           ...doc.data()
         });
       });
       
-      setUsers(usersList);
-      setFilteredUsers(usersList);
+      setItems(itemsList);
+      setFilteredItems(itemsList);
       setLoading(false);
       setRefreshing(false);
     } catch (error) {
-      console.error("Error fetching users:", error);
-      Alert.alert("Error", "No se pudieron cargar los usuarios");
+      console.error(`Error fetching ${activeCategory.name}:`, error);
+      Alert.alert("Error", `No se pudieron cargar los ${activeCategory.name.toLowerCase()}`);
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchUsers();
+  const getSortFieldForCategory = () => {
+    // Return appropriate default sort field based on category
+    switch(activeCategory.id) {
+      case 'users':
+        return sortBy === 'createdAt' ? 'createdAt' : (sortBy === 'email' ? 'email' : 'name');
+      case 'mentors':
+        return sortBy === 'createdAt' ? 'createdAt' : 'name';
+      case 'posts':
+        return sortBy === 'createdAt' ? 'createdAt' : (sortBy === 'userName' ? 'userName' : 'caption');
+      case 'locations':
+        return sortBy === 'createdAt' ? 'createdAt' : 'title';
+      case 'forums':
+        return sortBy === 'createdAt' ? 'createdAt' : 'title';
+      default:
+        return 'name';
+    }
   };
 
-interface DeleteUserAlertOptions {
-    text: string;
-    style: "cancel" | "destructive";
-    onPress?: () => Promise<void> | void;
-}
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchItems();
+  };
 
-const handleDeleteUser = (userId: string): void => {
-    const alertOptions: DeleteUserAlertOptions[] = [
-        {
-            text: "Cancelar",
-            style: "cancel"
-        },
-        { 
-            text: "Eliminar", 
-            style: "destructive",
-            onPress: async () => {
-                try {
-                    await deleteDoc(doc(firestore, "users", userId));
-                    // Remove user from state
-                    const updatedUsers = users.filter(user => user.id !== userId);
-                    setUsers(updatedUsers);
-                    setFilteredUsers(updatedUsers);
-                    Alert.alert("Éxito", "Usuario eliminado correctamente");
-                } catch (error) {
-                    console.error("Error deleting user:", error);
-                    Alert.alert("Error", "No se pudo eliminar el usuario");
-                }
-            }
+  const handleDeleteItem = (itemId: string) => {
+    const alertOptions = [
+      {
+        text: "Cancelar",
+        style: "cancel" as "cancel"
+      },
+      { 
+        text: "Eliminar", 
+        style: "destructive" as "destructive",
+        onPress: async () => {
+          try {
+            await deleteDoc(doc(firestore, activeCategory.collection, itemId));
+            // Remove item from state
+            const updatedItems = items.filter(item => item.id !== itemId);
+            setItems(updatedItems);
+            setFilteredItems(updatedItems);
+            Alert.alert("Éxito", `${activeCategory.name.slice(0, -1)} eliminado correctamente`);
+          } catch (error) {
+            console.error(`Error deleting ${activeCategory.name.slice(0, -1)}:`, error);
+            Alert.alert("Error", `No se pudo eliminar el ${activeCategory.name.slice(0, -1).toLowerCase()}`);
+          }
         }
+      }
     ];
 
     Alert.alert(
-        "Confirmar eliminación",
-        "¿Estás seguro que deseas eliminar este usuario? Esta acción no se puede deshacer.",
-        alertOptions
+      "Confirmar eliminación",
+      `¿Estás seguro que deseas eliminar este ${activeCategory.name.slice(0, -1).toLowerCase()}? Esta acción no se puede deshacer.`,
+      alertOptions
     );
-};
+  };
 
   const toggleSortOrder = () => {
     const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
     setSortOrder(newOrder);
     // Re-fetch with new sort order
-    fetchUsers();
+    fetchItems();
   };
 
-const changeSortBy = (field: 'name' | 'email' | 'createdAt'): void => {
+  const changeSortBy = (field: string) => {
     setSortBy(field);
     // Re-fetch with new sort field
-    fetchUsers();
-};
+    fetchItems();
+  };
 
-  const renderUserItem = ({ item }: { item: User }) => (
-    <View style={styles.userCard}>
-      <View style={styles.userInfo}>
+  const getSortOptions = () => {
+    // Return appropriate sort options based on category
+    switch(activeCategory.id) {
+      case 'users':
+        return [
+          { id: 'name', label: 'Nombre' },
+          { id: 'email', label: 'Email' },
+          { id: 'createdAt', label: 'Fecha' }
+        ];
+      case 'mentors':
+        return [
+          { id: 'name', label: 'Nombre' },
+          { id: 'specialty', label: 'Especialidad' },
+          { id: 'createdAt', label: 'Fecha' }
+        ];
+      case 'posts':
+        return [
+          { id: 'caption', label: 'Título' },
+          { id: 'userName', label: 'Usuario' },
+          { id: 'createdAt', label: 'Fecha' }
+        ];
+      case 'locations':
+        return [
+          { id: 'title', label: 'Nombre' },
+          { id: 'type', label: 'Tipo' },
+          { id: 'createdAt', label: 'Fecha' }
+        ];
+      case 'forums':
+        return [
+          { id: 'title', label: 'Título' },
+          { id: 'authorName', label: 'Autor' },
+          { id: 'createdAt', label: 'Fecha' }
+        ];
+      default:
+        return [
+          { id: 'name', label: 'Nombre' },
+          { id: 'createdAt', label: 'Fecha' }
+        ];
+    }
+  };
+
+  const renderItem = ({ item }: { item: DataItem }) => {
+    // Render different item layouts based on category
+    switch(activeCategory.id) {
+      case 'users':
+        return renderUserItem(item as User);
+      case 'mentors':
+        return renderMentorItem(item as Mentor);
+      case 'posts':
+        return renderPostItem(item as Post);
+      case 'locations':
+        return renderLocationItem(item as Location);
+      case 'forums':
+        return renderForumItem(item as Forum);
+      default:
+        return null;
+    }
+  };
+
+  const renderUserItem = (user: User) => (
+    <View style={styles.itemCard}>
+      <View style={styles.itemInfo}>
         <View style={styles.avatarContainer}>
-          {item.photoURL ? (
-            <Image source={{ uri: item.photoURL }} style={styles.avatar} />
+          {user.photoURL ? (
+            <Image source={{ uri: user.photoURL }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.defaultAvatar]}>
-              <Text style={styles.avatarText}>{item.name ? item.name.charAt(0).toUpperCase() : '?'}</Text>
+              <Text style={styles.avatarText}>{user.name ? user.name.charAt(0).toUpperCase() : '?'}</Text>
             </View>
           )}
         </View>
         
-        <View style={styles.userDetails}>
-          <Text style={styles.userName}>{item.name || 'Sin nombre'}</Text>
-          <Text style={styles.userEmail}>{item.email || 'Sin email'}</Text>
-          {item.role && <Text style={styles.userRole}>{item.role}</Text>}
+        <View style={styles.itemDetails}>
+          <Text style={styles.itemTitle}>{user.name || 'Sin nombre'}</Text>
+          <Text style={styles.itemSubtitle}>{user.email || 'Sin email'}</Text>
+          {user.role && <Text style={styles.itemMeta}>{user.role}</Text>}
         </View>
       </View>
       
-      <View style={styles.userActions}>
+      <View style={styles.itemActions}>
         <TouchableOpacity 
           style={[styles.actionButton, styles.editButton]}
-          onPress={() => navigation.navigate('EditUser', { userId: item.id })}
+          onPress={() => navigation.navigate('EditItem', { itemId: user.id, category: activeCategory.id })}
         >
           <Feather name="edit-2" size={16} color="#fff" />
         </TouchableOpacity>
         
         <TouchableOpacity 
           style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDeleteUser(item.id)}
+          onPress={() => handleDeleteItem(user.id)}
+        >
+          <Feather name="trash-2" size={16} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderMentorItem = (mentor: Mentor) => (
+    <View style={styles.itemCard}>
+      <View style={styles.itemInfo}>
+        <View style={styles.avatarContainer}>
+          {mentor.photoURL ? (
+            <Image source={{ uri: mentor.photoURL }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.defaultAvatar]}>
+              <Text style={styles.avatarText}>{mentor.name ? mentor.name.charAt(0).toUpperCase() : '?'}</Text>
+            </View>
+          )}
+        </View>
+        
+        <View style={styles.itemDetails}>
+          <Text style={styles.itemTitle}>{mentor.name || 'Sin nombre'}</Text>
+          <Text style={styles.itemSubtitle}>{mentor.specialty || 'Sin especialidad'}</Text>
+        </View>
+      </View>
+      
+      <View style={styles.itemActions}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.editButton]}
+          onPress={() => navigation.navigate('EditItem', { itemId: mentor.id, category: activeCategory.id })}
+        >
+          <Feather name="edit-2" size={16} color="#fff" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={() => handleDeleteItem(mentor.id)}
+        >
+          <Feather name="trash-2" size={16} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderPostItem = (post: Post) => (
+    <View style={styles.itemCard}>
+      <View style={styles.itemInfo}>
+        {post.image && (
+          <View style={styles.postImageContainer}>
+            <Image 
+              source={{ uri: post.image }} 
+              style={styles.postThumbnail}
+              resizeMode="cover"
+            />
+          </View>
+        )}
+        
+        <View style={styles.itemDetails}>
+          <Text style={styles.itemTitle}>{post.caption || post.text || 'Sin título'}</Text>
+          <Text style={styles.itemSubtitle}>
+            Por: {post.userName || 'Anónimo'} {post.location ? `• ${post.location}` : ''}
+          </Text>
+          <View style={styles.postStats}>
+            <View style={styles.postStat}>
+              <Ionicons name="heart" size={14} color="#b388ff" />
+              <Text style={styles.postStatText}>
+                {post.likes ? Object.keys(post.likes).length : 0}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+      
+      <View style={styles.itemActions}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.editButton]}
+          onPress={() => navigation.navigate('EditItem', { itemId: post.id, category: activeCategory.id })}
+        >
+          <Feather name="edit-2" size={16} color="#fff" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={() => handleDeleteItem(post.id)}
+        >
+          <Feather name="trash-2" size={16} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderLocationItem = (location: Location) => (
+    <View style={styles.itemCard}>
+      <View style={styles.itemInfo}>
+        {location.imageUrl && (
+          <View style={styles.locationImageContainer}>
+            <Image 
+              source={{ uri: location.imageUrl }} 
+              style={styles.locationThumbnail}
+              resizeMode="cover"
+            />
+          </View>
+        )}
+        
+        <View style={styles.itemDetails}>
+          <Text style={styles.itemTitle}>{location.title || 'Sin nombre'}</Text>
+          <Text style={styles.itemSubtitle} numberOfLines={2}>
+            {location.description || 'Sin descripción'}
+          </Text>
+          
+          {location.geoPoint && (
+            <Text style={styles.itemMeta}>
+              {location.geoPoint.latitude.toFixed(4)}, {location.geoPoint.longitude.toFixed(4)}
+            </Text>
+          )}
+          
+          {location.type && location.type.length > 0 && (
+            <View style={styles.tagContainer}>
+              {location.type.map((tag, index) => (
+                <View key={index} style={styles.tag}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      </View>
+      
+      <View style={styles.itemActions}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.editButton]}
+          onPress={() => navigation.navigate('EditItem', { itemId: location.id, category: activeCategory.id })}
+        >
+          <Feather name="edit-2" size={16} color="#fff" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={() => handleDeleteItem(location.id)}
+        >
+          <Feather name="trash-2" size={16} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderForumItem = (forum: Forum) => (
+    <View style={styles.itemCard}>
+      <View style={styles.itemInfo}>
+        <View style={styles.itemDetails}>
+          <Text style={styles.itemTitle}>{forum.title || 'Sin título'}</Text>
+          <Text style={styles.itemSubtitle} numberOfLines={2}>{forum.question || 'Sin pregunta'}</Text>
+          <Text style={styles.itemMeta}>Por: {forum.authorName || 'Anónimo'}</Text>
+        </View>
+      </View>
+      
+      <View style={styles.itemActions}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.editButton]}
+          onPress={() => navigation.navigate('EditItem', { itemId: forum.id, category: activeCategory.id })}
+        >
+          <Feather name="edit-2" size={16} color="#fff" />
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={() => handleDeleteItem(forum.id)}
         >
           <Feather name="trash-2" size={16} color="#fff" />
         </TouchableOpacity>
@@ -179,8 +521,8 @@ const changeSortBy = (field: 'name' | 'email' | 'createdAt'): void => {
 
   const renderEmptyList = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="people-outline" size={64} color="#555" />
-      <Text style={styles.emptyText}>No hay usuarios para mostrar</Text>
+      {activeCategory.icon}
+      <Text style={styles.emptyText}>No hay {activeCategory.name.toLowerCase()} para mostrar</Text>
       {searchQuery.length > 0 && (
         <Text style={styles.emptySubText}>Intenta con otra búsqueda</Text>
       )}
@@ -189,13 +531,11 @@ const changeSortBy = (field: 'name' | 'email' | 'createdAt'): void => {
 
   const renderHeader = () => (
     <View style={styles.headerContainer}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-
       <View style={styles.searchContainer}>
         <Feather name="search" size={20} color="#666" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Buscar usuarios..."
+          placeholder={`Buscar ${activeCategory.name.toLowerCase()}...`}
           placeholderTextColor="#666"
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -206,31 +546,21 @@ const changeSortBy = (field: 'name' | 'email' | 'createdAt'): void => {
           </TouchableOpacity>
         )}
       </View>
-        </View>
       
       <View style={styles.sortContainer}>
         <Text style={styles.sortLabel}>Ordenar por:</Text>
         <View style={styles.sortButtons}>
-          <TouchableOpacity 
-            style={[styles.sortButton, sortBy === 'name' && styles.sortButtonActive]}
-            onPress={() => changeSortBy('name')}
-          >
-            <Text style={[styles.sortButtonText, sortBy === 'name' && styles.sortButtonTextActive]}>Nombre</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.sortButton, sortBy === 'email' && styles.sortButtonActive]}
-            onPress={() => changeSortBy('email')}
-          >
-            <Text style={[styles.sortButtonText, sortBy === 'email' && styles.sortButtonTextActive]}>Email</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.sortButton, sortBy === 'createdAt' && styles.sortButtonActive]}
-            onPress={() => changeSortBy('createdAt')}
-          >
-            <Text style={[styles.sortButtonText, sortBy === 'createdAt' && styles.sortButtonTextActive]}>Fecha</Text>
-          </TouchableOpacity>
+          {getSortOptions().map(option => (
+            <TouchableOpacity 
+              key={option.id}
+              style={[styles.sortButton, sortBy === option.id && styles.sortButtonActive]}
+              onPress={() => changeSortBy(option.id)}
+            >
+              <Text style={[styles.sortButtonText, sortBy === option.id && styles.sortButtonTextActive]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
           
           <TouchableOpacity onPress={toggleSortOrder} style={styles.sortOrderButton}>
             <MaterialIcons 
@@ -244,7 +574,7 @@ const changeSortBy = (field: 'name' | 'email' | 'createdAt'): void => {
       
       <View style={styles.statsContainer}>
         <Text style={styles.statsText}>
-          Mostrando {filteredUsers.length} de {users.length} usuarios
+          Mostrando {filteredItems.length} de {items.length} {activeCategory.name.toLowerCase()}
         </Text>
       </View>
     </View>
@@ -254,16 +584,49 @@ const changeSortBy = (field: 'name' | 'email' | 'createdAt'): void => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
       
+
+      
+      {/* Fixed height container for category selector */}
+      <View style={styles.categorySelectorContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categorySelectorContent}
+        >
+          {categories.map(category => (
+            <TouchableOpacity
+              key={category.id}
+              style={[
+                styles.categoryButton,
+                activeCategory.id === category.id && styles.categoryButtonActive
+              ]}
+              onPress={() => setActiveCategory(category)}
+            >
+              <View style={styles.categoryIconContainer}>
+                {category.icon}
+              </View>
+              <Text 
+                style={[
+                  styles.categoryButtonText,
+                  activeCategory.id === category.id && styles.categoryButtonTextActive
+                ]}
+              >
+                {category.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
       
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#b388ff" />
-          <Text style={styles.loadingText}>Cargando usuarios...</Text>
+          <Text style={styles.loadingText}>Cargando {activeCategory.name.toLowerCase()}...</Text>
         </View>
       ) : (
         <FlatList
-          data={filteredUsers}
-          renderItem={renderUserItem}
+          data={filteredItems}
+          renderItem={renderItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContainer}
           ListHeaderComponent={renderHeader}
@@ -279,7 +642,12 @@ const changeSortBy = (field: 'name' | 'email' | 'createdAt'): void => {
         />
       )}
       
-
+      <TouchableOpacity 
+        style={styles.floatingButton}
+        onPress={() => navigation.navigate('AddItem', { category: activeCategory.id })}
+      >
+        <Ionicons name="add" size={30} color="#000" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -298,10 +666,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#222',
   },
-  backButton: {
-    padding: 8,
-    marginTop: -12,
-  },
   headerTitle: {
     color: '#fff',
     fontSize: 20,
@@ -309,6 +673,49 @@ const styles = StyleSheet.create({
   },
   addButton: {
     padding: 8,
+  },
+  // Fixed height container for category selector
+  categorySelectorContainer: {
+    height: 64, // Fixed height that accommodates the category buttons
+    backgroundColor: '#111',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+    justifyContent: 'center', // Center the ScrollView vertically
+  },
+  categorySelectorContent: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    alignItems: 'center', // Ensure all items are vertically centered
+  },
+  categoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginHorizontal: 4,
+    borderRadius: 20,
+    backgroundColor: '#222',
+    height: 40, // Fixed height for all buttons
+    minWidth: 100, // Minimum width to ensure consistent sizing
+  },
+  categoryButtonActive: {
+    backgroundColor: '#b388ff33',
+  },
+  categoryIconContainer: {
+    marginRight: 8,
+    width: 24, // Fixed width for icon container
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryButtonText: {
+    color: '#999',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  categoryButtonTextActive: {
+    color: '#b388ff',
+    fontWeight: 'bold',
   },
   loadingContainer: {
     flex: 1,
@@ -336,7 +743,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     marginBottom: 16,
-    width: '100%',
   },
   searchIcon: {
     marginRight: 8,
@@ -358,12 +764,14 @@ const styles = StyleSheet.create({
   sortButtons: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   sortButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 16,
     marginRight: 8,
+    marginBottom: 8,
     backgroundColor: '#222',
   },
   sortButtonActive: {
@@ -386,7 +794,7 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 14,
   },
-  userCard: {
+  itemCard: {
     backgroundColor: '#1a1a1a',
     borderRadius: 8,
     marginHorizontal: 16,
@@ -396,13 +804,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  userInfo: {
+  itemInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
   avatarContainer: {
     marginRight: 12,
+  },
+  locationIconContainer: {
+    marginRight: 12,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#2a2a2a',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatar: {
     width: 50,
@@ -419,26 +836,26 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  userDetails: {
+  itemDetails: {
     flex: 1,
   },
-  userName: {
+  itemTitle: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 4,
   },
-  userEmail: {
+  itemSubtitle: {
     color: '#999',
     fontSize: 14,
     marginBottom: 4,
   },
-  userRole: {
+  itemMeta: {
     color: '#b388ff',
     fontSize: 12,
     fontWeight: '500',
   },
-  userActions: {
+  itemActions: {
     flexDirection: 'row',
   },
   actionButton: {
@@ -487,5 +904,63 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
+  },
+  // New styles for posts and locations
+  postImageContainer: {
+    marginRight: 12,
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#2a2a2a',
+  },
+  postThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  postStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  postStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  postStatText: {
+    color: '#b388ff',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  locationImageContainer: {
+    marginRight: 12,
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#2a2a2a',
+  },
+  locationThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  tagContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4,
+  },
+  tag: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  tagText: {
+    color: '#b388ff',
+    fontSize: 10,
+    fontWeight: '500',
   },
 });
