@@ -33,6 +33,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Picker } from '@react-native-picker/picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { serverTimestamp as firebaseServerTimestamp } from 'firebase/firestore';
 
 
 
@@ -724,3 +725,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },  
 });
+function serverTimestamp(): any {
+  return firebaseServerTimestamp();
+}
