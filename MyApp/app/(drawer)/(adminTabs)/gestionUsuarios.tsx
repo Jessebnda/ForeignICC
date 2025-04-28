@@ -15,11 +15,14 @@ import {
   ScrollView
 } from 'react-native';
 import { Ionicons, Feather, MaterialIcons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
-import { collection, getDocs, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, query, orderBy, where } from 'firebase/firestore';
 import { firestore } from '../../../firebase';
+import { useRouter } from 'expo-router';   // ← añadir
 
 //@ts-ignore
-export default function ManagementScreen({ navigation }) {
+export default function ManagementScreen() {
+  const router = useRouter();               // ← reemplaza navigation
+
   interface User {
     id: string;
     name?: string;
@@ -31,8 +34,9 @@ export default function ManagementScreen({ navigation }) {
   interface Mentor {
     id: string;
     name?: string;
-    specialty?: string;
     photoURL?: string;
+    specialty?: string;
+    areas?: string[];     // ← añadido
   }
 
   interface Post {
@@ -74,38 +78,13 @@ export default function ManagementScreen({ navigation }) {
 
   type DataItem = User | Mentor | Post | Location | Forum;
 
-  // Category configuration
+  // Category configuration (solo una declaración)
   const categories = [
-    { 
-      id: 'users', 
-      name: 'Estudiantes', 
-      collection: 'users',
-      icon: <Ionicons name="person-outline" size={24} color="#b388ff" />
-    },
-    { 
-      id: 'mentors', 
-      name: 'Mentores', 
-      collection: 'mentors',
-      icon: <FontAwesome5 name="chalkboard-teacher" size={22} color="#b388ff" />
-    },
-    { 
-      id: 'posts', 
-      name: 'Posts', 
-      collection: 'feedPosts',
-      icon: <MaterialCommunityIcons name="post-outline" size={24} color="#b388ff" />
-    },
-    { 
-      id: 'locations', 
-      name: 'Ubicaciones', 
-      collection: 'mapLocations',
-      icon: <MaterialIcons name="location-on" size={24} color="#b388ff" />
-    },
-    { 
-      id: 'forums', 
-      name: 'Foros', 
-      collection: 'forumQuestions',
-      icon: <MaterialCommunityIcons name="forum-outline" size={24} color="#b388ff" />
-    }
+    { id: 'users',    name: 'Estudiantes', collection: 'users',    icon: <Ionicons name="person-outline" size={24} color="#b388ff" /> },
+    { id: 'mentors',  name: 'Mentores',    collection: 'users',    icon: <FontAwesome5 name="chalkboard-teacher" size={22} color="#b388ff" /> },  // ← aquí
+    { id: 'posts',    name: 'Posts',       collection: 'feedPosts', icon: <MaterialCommunityIcons name="post-outline" size={24} color="#b388ff" /> },
+    { id: 'locations', name: 'Ubicaciones', collection: 'mapLocations',icon: <MaterialIcons name="location-on" size={24} color="#b388ff" /> },
+    { id: 'forums',   name: 'Foros',       collection: 'forumQuestions',icon: <MaterialCommunityIcons name="forum-outline" size={24} color="#b388ff" /> }
   ];
 
   const [activeCategory, setActiveCategory] = useState(categories[0]);
@@ -157,24 +136,23 @@ export default function ManagementScreen({ navigation }) {
     try {
       setLoading(true);
       setSearchQuery('');
-      
-      // Get appropriate sort field based on category
-      let sortField = getSortFieldForCategory();
-      
-      // Create a query with sorting
-      const itemsRef = collection(firestore, activeCategory.collection);
-      const q = query(itemsRef, orderBy(sortField, sortOrder));
-      
-      const querySnapshot = await getDocs(q);
-      const itemsList: DataItem[] = [];
-      
-      querySnapshot.forEach((doc) => {
-        itemsList.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-      
+      const sortField = getSortFieldForCategory();
+      let q;
+      if (activeCategory.id === 'mentors') {
+        // ↪ traer de 'users' donde isMentor===true
+        q = query(
+          collection(firestore, 'users'),
+          where('isMentor', '==', true),
+          orderBy(sortField, sortOrder)
+        );
+      } else {
+        q = query(
+          collection(firestore, activeCategory.collection),
+          orderBy(sortField, sortOrder)
+        );
+      }
+      const snap = await getDocs(q);
+      const itemsList: DataItem[] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setItems(itemsList);
       setFilteredItems(itemsList);
       setLoading(false);
@@ -337,7 +315,7 @@ export default function ManagementScreen({ navigation }) {
       <View style={styles.itemActions}>
         <TouchableOpacity 
           style={[styles.actionButton, styles.editButton]}
-          onPress={() => navigation.navigate('EditItem', { itemId: user.id, category: activeCategory.id })}
+          onPress={() => router.push({ pathname: './editItem', params: { itemId: user.id, category: activeCategory.id } })}
         >
           <Feather name="edit-2" size={16} color="#fff" />
         </TouchableOpacity>
@@ -367,14 +345,16 @@ export default function ManagementScreen({ navigation }) {
         
         <View style={styles.itemDetails}>
           <Text style={styles.itemTitle}>{mentor.name || 'Sin nombre'}</Text>
-          <Text style={styles.itemSubtitle}>{mentor.specialty || 'Sin especialidad'}</Text>
+          <Text style={styles.itemSubtitle}>
+            {mentor.areas?.join(', ') || 'Sin especialidad'}
+          </Text>
         </View>
       </View>
       
       <View style={styles.itemActions}>
         <TouchableOpacity 
           style={[styles.actionButton, styles.editButton]}
-          onPress={() => navigation.navigate('EditItem', { itemId: mentor.id, category: activeCategory.id })}
+          onPress={() => router.push({ pathname: './editItem', params: { itemId: mentor.id, category: activeCategory.id } })}
         >
           <Feather name="edit-2" size={16} color="#fff" />
         </TouchableOpacity>
@@ -421,7 +401,7 @@ export default function ManagementScreen({ navigation }) {
       <View style={styles.itemActions}>
         <TouchableOpacity 
           style={[styles.actionButton, styles.editButton]}
-          onPress={() => navigation.navigate('EditItem', { itemId: post.id, category: activeCategory.id })}
+          onPress={() => router.push({ pathname: './editItem', params: { itemId: post.id, category: activeCategory.id } })}
         >
           <Feather name="edit-2" size={16} color="#fff" />
         </TouchableOpacity>
@@ -476,7 +456,7 @@ export default function ManagementScreen({ navigation }) {
       <View style={styles.itemActions}>
         <TouchableOpacity 
           style={[styles.actionButton, styles.editButton]}
-          onPress={() => navigation.navigate('EditItem', { itemId: location.id, category: activeCategory.id })}
+          onPress={() => router.push({ pathname: './editItem', params: { itemId: location.id, category: activeCategory.id } })}
         >
           <Feather name="edit-2" size={16} color="#fff" />
         </TouchableOpacity>
@@ -504,7 +484,7 @@ export default function ManagementScreen({ navigation }) {
       <View style={styles.itemActions}>
         <TouchableOpacity 
           style={[styles.actionButton, styles.editButton]}
-          onPress={() => navigation.navigate('EditItem', { itemId: forum.id, category: activeCategory.id })}
+          onPress={() => router.push({ pathname: './editItem', params: { itemId: forum.id, category: activeCategory.id } })}
         >
           <Feather name="edit-2" size={16} color="#fff" />
         </TouchableOpacity>
@@ -641,10 +621,20 @@ export default function ManagementScreen({ navigation }) {
           }
         />
       )}
-      
-      <TouchableOpacity 
+
+      {/* ↓ CAMBIO: lanzar AddMentor si la categoría activa es 'mentors' */}
+      <TouchableOpacity
         style={styles.floatingButton}
-        onPress={() => navigation.navigate('AddItem', { category: activeCategory.id })}
+        onPress={() => {
+          if (activeCategory.id === 'mentors') {
+            router.push({ pathname: './addMentor' });
+          } else {
+            router.push({
+              pathname: './addItem',
+              params: { category: activeCategory.id }
+            });
+          }
+        }}
       >
         <Ionicons name="add" size={30} color="#000" />
       </TouchableOpacity>

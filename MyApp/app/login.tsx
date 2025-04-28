@@ -135,6 +135,7 @@ export default function LoginScreen() {
             createdAt: serverTimestamp(),
             interests: [],
             isAdmin: false,
+            isMentor: false,
             // Add other default fields as needed
           });
         } catch (error) {
