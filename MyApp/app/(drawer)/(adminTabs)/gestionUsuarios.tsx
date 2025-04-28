@@ -584,16 +584,7 @@ export default function ManagementScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
       
-      {/* Category Selector */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Gestión de {activeCategory.name}</Text>
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={() => navigation.navigate('AddItem', { category: activeCategory.id })}
-        >
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
+
       
       {/* Fixed height container for category selector */}
       <View style={styles.categorySelectorContainer}>
