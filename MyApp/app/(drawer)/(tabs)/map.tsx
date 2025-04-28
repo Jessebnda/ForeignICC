@@ -18,7 +18,22 @@ import { firestore } from '../../../firebase';
 import { getAuth } from 'firebase/auth';
 import { doc, getDoc, collection, getDocs, setDoc } from 'firebase/firestore';
 import { GeoPoint } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../../../firebase';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
 
+type Place = {
+  id: string;
+  title: string;
+  description: string;
+  geoPoint: { latitude: number; longitude: number };
+  type: string[];
+  imageUrl: string;
+  createdBy: string;
+  rating: { userId: string; stars: number }[];
+};
 
 
 const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
@@ -36,7 +51,30 @@ export default function MapScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [friendIds, setFriendIds] = useState<string[]>([]);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [review, setReview] = useState('');
+  const [stars, setStars] = useState(5);
+  const [manualMarkerDescription, setManualMarkerDescription] = useState('');
+  const [manualMarkerImageUri, setManualMarkerImageUri] = useState<string | null>(null);
+  const [manualMarkerRating, setManualMarkerRating] = useState(0);
+  const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
+  const [placeModalVisible, setPlaceModalVisible] = useState(false);
 
+  //Subir imgs a storage
+  const uploadImages = async (uris: string[]) => {
+    const urls = [];
+    for (const uri of uris) {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const filename = `mapLocations/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+      const refStorage = ref(storage, filename);
+      await uploadBytes(refStorage, blob);
+      const downloadUrl = await getDownloadURL(refStorage);
+      urls.push(downloadUrl);
+    }
+    return urls;
+  };
+  
   //auth y amigos
   useEffect(() => {
     const auth = getAuth();
@@ -80,6 +118,7 @@ export default function MapScreen() {
             type: loc.type,
             imageUrl: loc.imageUrl,
             createdBy: loc.createdBy,
+            rating: loc.rating || [],
           }));
         setLocations(loadedLocations);
       } catch (error) {
@@ -96,70 +135,91 @@ export default function MapScreen() {
 
   //nuevo lugar
   const handleLongPress = (e: any) => {
-    if (!isAddingPlace) return;
+    if (!isAddingPlace) return; // SOLO si activamos agregar lugar
     setManualMarkerCoords(e.nativeEvent.coordinate);
-    setModalVisible(true);
+    setModalVisible(true); // 🔥 Aquí abres el modal
   };
-
-  //marcador
+  
+  //crear el pin (ubicacion)
   const handleAddManualMarker = async () => {
     if (!manualMarkerCoords || !manualMarkerName.trim() || !currentUserId) {
-      Alert.alert('Error', 'Completa los datos.');
+      Alert.alert('Error', 'Completa todos los datos.');
       return;
     }
   
-    const newId = Date.now().toString();
+    let imageUrls: string[] = [];
+    if (selectedImages.length > 0) {
+      imageUrls = await uploadImages(selectedImages);
+    }
   
+    const newId = Date.now().toString();
+    
     const newMarker = {
       locationId: newId,
       title: manualMarkerName.trim(),
-      description: 'Lugar agregado manualmente',
+      description: review.trim(),
+      rating: [{ userId: currentUserId, stars }],
       geoPoint: new GeoPoint(
         manualMarkerCoords.latitude,
         manualMarkerCoords.longitude
       ),
       type: ['favoritos'],
-      imageUrl: '', // podrías agregar luego
+      imageUrl: imageUrls.length > 0 ? imageUrls[0] : '',
+      imageUrls,
       createdBy: currentUserId,
       createdAt: new Date(),
-      rating: [],
     };
   
     try {
       await setDoc(doc(firestore, 'mapLocations', newId), newMarker);
-      Alert.alert('✅ Lugar guardado en Firestore');
-  
-      // Refrescar lugares
+      Alert.alert('✅ Lugar guardado correctamente');
+      // limpiar estados
       setManualMarkerName('');
       setManualMarkerCoords(null);
+      setReview('');
+      setStars(5);
+      setSelectedImages([]);
       setModalVisible(false);
       setIsAddingPlace(false);
-  
-      // Vuelve a cargar
-      const refreshed = await getDocs(collection(firestore, 'mapLocations'));
-      const loadedLocations = refreshed.docs
-        .map((doc) => doc.data())
-        .filter((loc) => loc.createdBy === currentUserId || friendIds.includes(loc.createdBy))
-        .map((loc) => ({
-          id: loc.locationId,
-          title: loc.title,
-          description: loc.description,
-          geoPoint: {
-            latitude: loc.geoPoint.latitude,
-            longitude: loc.geoPoint.longitude,
-          },
-          type: loc.type,
-          imageUrl: loc.imageUrl,
-          createdBy: loc.createdBy,
-        }));
-      setLocations(loadedLocations);
+      // Refrescar lugares
+      fetchLocationsAgain(); // <-- haces un refetch de lugares
     } catch (error) {
       console.error('❌ Error guardando lugar:', error);
     }
   };
+  //volver a fetchear ubis
+  const fetchLocationsAgain = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(firestore, 'mapLocations'));
+      const loadedLocations = querySnapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: data.locationId,
+          title: data.title,
+          description: data.description,
+          geoPoint: {
+            latitude: data.geoPoint.latitude,
+            longitude: data.geoPoint.longitude,
+          },
+          type: data.type,
+          imageUrl: data.imageUrl,
+          createdBy: data.createdBy,
+          rating: data.rating || [],
+        };
+      });
+      setLocations(loadedLocations);
+    } catch (error) {
+      console.error('❌ Error recargando lugares:', error);
+    }
+  };  
   
-  
-  
+  //diferentes colores para los pines
+  const getPinColor = (createdBy: string) => {
+    if (createdBy === currentUserId) return '#4f0c2e'; // Mi lugar
+    const friendIndex = friendIds.indexOf(createdBy);
+    const friendColors = ['#42A5F5', '#66BB6A', '#FFA726', '#EF5350'];
+    return friendColors[friendIndex % friendColors.length] || '#FFCA28'; // amarillo si excede
+  };
   
   // Ubicación del usuario
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
@@ -199,6 +259,7 @@ export default function MapScreen() {
     setPendingTypes(confirmedTypes);
   }, []);
 
+  
   useEffect(() => {
     const fetchLocations = async () => {
       try {
@@ -215,6 +276,7 @@ export default function MapScreen() {
             },
             type: data.type,
             imageUrl: data.imageUrl,
+            rating: data.rating || [],
           };
         });
         setLocations(loadedLocations);
@@ -227,8 +289,6 @@ export default function MapScreen() {
   
     fetchLocations();
   }, []);
-
-
 
   const handleApplyFilters = () => {
     setConfirmedTypes([...pendingTypes]);
@@ -278,12 +338,16 @@ export default function MapScreen() {
     setModalVisible(false);
     setIsAddingPlace(false);
   };*/
-
+ 
+  //para lograr el long press
   const toggleAddingPlace = () => {
-    setIsAddingPlace(prev => !prev);
+    setIsAddingPlace((prev) => !prev);
     if (isAddingPlace) {
       setManualMarkerCoords(null);
       setManualMarkerName('');
+      setSelectedImages([]);
+      setReview('');
+      setStars(5);
     }
   };
 
@@ -327,6 +391,25 @@ export default function MapScreen() {
     }
   };
 
+  const pickImagesFromLibrary = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsMultipleSelection: true,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 1,
+        selectionLimit: 5, // máximo 5 imágenes
+      });
+  
+      if (!result.canceled) {
+        const selected = result.assets.map((asset) => asset.uri);
+        setSelectedImages(selected);
+      }
+    } catch (error) {
+      console.error('❌ Error seleccionando imágenes:', error);
+    }
+  };
+  
+
   const filteredLocations = locations.filter((place) => {
     if (confirmedTypes.length === 0) return true;
     return place.type.some((t: string) => confirmedTypes.includes(t));
@@ -347,25 +430,44 @@ export default function MapScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      
       {/* Header con filtros */}
       <View style={styles.header}>
-        <ScrollView horizontal style={styles.chipsContainer} contentContainerStyle={styles.chipsContent} showsHorizontalScrollIndicator={false}>
-          {availablePlaceTypes.map(type => {
+        <ScrollView 
+          horizontal 
+          style={styles.chipsContainer} 
+          contentContainerStyle={styles.chipsContent} 
+          showsHorizontalScrollIndicator={false}
+        >
+          {availablePlaceTypes.map((type) => {
             const selected = pendingTypes.includes(type);
             return (
-              <TouchableOpacity key={type} style={[styles.chip, selected && styles.chipSelected]} onPress={() => toggleTypeSelection(type)}>
-                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{type.toUpperCase()}</Text>
+              <TouchableOpacity
+                key={type}
+                style={[styles.chip, selected && styles.chipSelected]}
+                onPress={() => toggleTypeSelection(type)}
+              >
+                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                  {type.toUpperCase()}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
+  
         {hasChanges && (
-          <TouchableOpacity style={styles.confirmButton} onPress={handleApplyFilters} disabled={isLoading}>
-            <Text style={styles.confirmButtonText}>{isLoading ? 'Buscando...' : 'Aplicar Filtros'}</Text>
+          <TouchableOpacity 
+            style={styles.confirmButton} 
+            onPress={handleApplyFilters} 
+            disabled={isLoading}
+          >
+            <Text style={styles.confirmButtonText}>
+              {isLoading ? 'Buscando...' : 'Aplicar Filtros'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
-      
+  
       {/* Mapa */}
       <View style={styles.mapContainer}>
         <MapView
@@ -379,21 +481,33 @@ export default function MapScreen() {
           onLongPress={handleLongPress}
           onPress={isRaiteActive ? handleMapPress : undefined}
         >
-          {userLocation && <Marker coordinate={userLocation} title="Tú" />}
+          {/* Marker de usuario */}
+          {userLocation && (
+            <Marker coordinate={userLocation} title="Tú" />
+          )}
+  
+          {/* Markers de ubicaciones */}
           {filteredLocations.map((place) => (
         <Marker
-          key={place.locationId}
+          key={place.id}
           coordinate={place.geoPoint}
           title={place.title}
           description={place.description}
-          pinColor="#4f0c2e"
+          pinColor={getPinColor(place.createdBy)}
+          onPress={() => {
+            setSelectedPlace(place);
+            setPlaceModalVisible(true);
+          }}
         />
       ))}
-
+  
+          {/* Marker de raite */}
           {isRaiteActive && selectedRaitePlace && (
             <Marker coordinate={selectedRaitePlace} pinColor="orange" title="Lugar para Raite" />
           )}
         </MapView>
+  
+        {/* Loading si está cargando */}
         {isLoading && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#bb86fc" />
@@ -401,18 +515,24 @@ export default function MapScreen() {
           </View>
         )}
       </View>
-      
-      {/* Botón para agregar marcador manual */}
+
+      {/* Botón para "Agregar Lugar" */}
       <TouchableOpacity style={styles.addButton} onPress={toggleAddingPlace}>
-        <Text style={styles.addButtonText}>{isAddingPlace ? 'Cancelar' : 'Agregar Lugar'}</Text>
-      </TouchableOpacity>
-      
-      {/* Botón para "Pedir Raite" */}
+      <Text style={styles.addButtonText}>
+        {isAddingPlace ? 'Cancelar' : 'Agregar Lugar'}
+      </Text>
+    </TouchableOpacity>
+
+      {/* Botón Pedir Raite */}
       <TouchableOpacity style={styles.raiteButton} onPress={toggleRaiteMode}>
-        <Text style={styles.raiteButtonText}>{isRaiteActive ? 'Cancelar Pedir Raite' : 'Pedir Raite'}</Text>
+        <Text style={styles.raiteButtonText}>
+          {isRaiteActive ? 'Cancelar Pedir Raite' : 'Pedir Raite'}
+        </Text>
       </TouchableOpacity>
-      
-      {/* Modal para agregar marcador manual */}
+  
+      {/* --- MODALES --- */}
+  
+      {/* Modal Agregar Lugar */}
       <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
@@ -425,57 +545,168 @@ export default function MapScreen() {
               onChangeText={setManualMarkerName}
             />
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalButton, styles.modalButtonCancel]} onPress={() => {
-                setModalVisible(false);
-                setIsAddingPlace(false);
-                setManualMarkerCoords(null);
-                setManualMarkerName('');
-              }}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonCancel]} 
+                onPress={() => {
+                  setModalVisible(false);
+                  setIsAddingPlace(false);
+                  setManualMarkerCoords(null);
+                  setManualMarkerName('');
+                }}
+              >
                 <Text style={styles.modalButtonText}>Cancelar</Text>
               </TouchableOpacity>
+  
+              <TouchableOpacity style={styles.addButton} onPress={toggleAddingPlace}>
+              <Text style={styles.addButtonText}>
+                {isAddingPlace ? 'Cancelar' : 'Agregar Lugar'}
+              </Text>
+            </TouchableOpacity>
 
-              <TouchableOpacity style={styles.modalButton} onPress={handleAddManualMarker}>
-                <Text style={styles.modalButtonText}>Guardar</Text>
-              </TouchableOpacity>
-              
             </View>
           </View>
         </View>
       </Modal>
-      
-      {/* Modal para confirmar "Pedir Raite" */}
-      <Modal visible={raiteConfirmModalVisible} transparent animationType="slide">
+     {/* Modal Consultar Lugar */}
+      <Modal visible={placeModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Confirmar Raite</Text>
-            <Text style={styles.modalMessage}>¿Seguro que quieres pedir raite a este lugar?</Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalButton, styles.modalButtonCancel]} onPress={cancelRaiteRequest}>
-                <Text style={styles.modalButtonText}>No</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalButton} onPress={confirmRaiteRequest}>
-                <Text style={styles.modalButtonText}>Sí</Text>
-              </TouchableOpacity>
-            </View>
+            {selectedPlace && (
+              <>
+                {selectedPlace.imageUrl ? (
+                  <Image
+                    source={{ uri: selectedPlace.imageUrl }}
+                    style={styles.placeImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={styles.modalTitleM}>Sin imagen disponible</Text>
+                )}
+                
+                <Text style={styles.modalTitleM}>{selectedPlace.title}</Text>
+                <Text style={styles.modalDescription}>{selectedPlace.description}</Text>
+                
+                <Text style={styles.modalRating}>
+                  {selectedPlace.rating && selectedPlace.rating.length > 0
+                    ? `⭐ ${selectedPlace.rating[0].stars} estrellas`
+                    : 'Sin calificación'}
+                </Text>
+
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonCancel]}
+                  onPress={() => setPlaceModalVisible(false)}
+                >
+                  <Text style={styles.modalButtonText}>Cerrar</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </Modal>
-      
-      {/* Modal para seleccionar amigos */}
+
+  
+      {/* Modal Confirmar Raite */}
+      <Modal visible={modalVisible} transparent animationType="slide">
+  <View style={styles.modalOverlay}>
+    <ScrollView contentContainerStyle={styles.modalContainer}>
+      <Text style={styles.modalTitle}>Agregar Nuevo Lugar</Text>
+
+      {/* Campo para el título */}
+      <TextInput
+        style={styles.modalInput}
+        placeholder="Nombre del lugar"
+        placeholderTextColor="#888"
+        value={manualMarkerName}
+        onChangeText={setManualMarkerName}
+      />
+
+      {/* Campo para la descripción */}
+      <TextInput
+        style={[styles.modalInput, { height: 100 }]}
+        placeholder="Descripción"
+        placeholderTextColor="#888"
+        value={manualMarkerDescription}
+        onChangeText={setManualMarkerDescription}
+        multiline
+      />
+
+      {/* Botón para elegir imagen */}
+      <TouchableOpacity style={styles.galleryButton} onPress={pickImagesFromLibrary}>
+        <Text style={styles.modalButtonText}>Seleccionar Imagen</Text>
+      </TouchableOpacity>
+
+      {/* Preview de imagen si hay */}
+      {manualMarkerImageUri && (
+  <Image
+    source={{ uri: manualMarkerImageUri }}
+    style={{ width: '100%', height: 200, borderRadius: 8, marginVertical: 10 }}
+    resizeMode="cover"
+  />
+)}
+
+
+      {/* Campo para poner estrellas (simple por ahora) */}
+      <Text style={styles.modalTitle}>Calificación:</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'center', marginVertical: 10 }}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <TouchableOpacity key={star} onPress={() => setManualMarkerRating(star)}>
+            <Text style={{ fontSize: 32, color: manualMarkerRating >= star ? '#FFD700' : '#888' }}>
+              ★
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Botones de acción */}
+      <View style={styles.modalButtons}>
+        <TouchableOpacity
+          style={[styles.modalButton, styles.modalButtonCancel]}
+          onPress={() => {
+            setModalVisible(false);
+            setIsAddingPlace(false);
+            setManualMarkerCoords(null);
+            setManualMarkerName('');
+            setManualMarkerDescription('');
+            setManualMarkerImageUri(null);
+            setManualMarkerRating(0);
+          }}
+        >
+          <Text style={styles.modalButtonText}>Cancelar</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.modalButton} onPress={handleAddManualMarker}>
+          <Text style={styles.modalButtonText}>Guardar</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  </View>
+</Modal>
+
+  
+      {/* Modal Seleccionar Amigos */}
       <Modal visible={friendSelectionModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Selecciona amigos</Text>
             <ScrollView style={styles.friendsList}>
-              {dummyFriends.map(friend => (
-                <TouchableOpacity key={friend.id} style={styles.friendItem} onPress={() => toggleFriendSelection(friend.id)}>
+              {dummyFriends.map((friend) => (
+                <TouchableOpacity 
+                  key={friend.id} 
+                  style={styles.friendItem} 
+                  onPress={() => toggleFriendSelection(friend.id)}
+                >
                   <Text style={styles.friendText}>{friend.name}</Text>
-                  {selectedFriends.includes(friend.id) && <Text style={styles.checkMark}>✓</Text>}
+                  {selectedFriends.includes(friend.id) && (
+                    <Text style={styles.checkMark}>✓</Text>
+                  )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={[styles.modalButton, styles.modalButtonCancel]} onPress={() => setFriendSelectionModalVisible(false)}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.modalButtonCancel]} 
+                onPress={() => setFriendSelectionModalVisible(false)}
+              >
                 <Text style={styles.modalButtonText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalButton} onPress={sendRaiteRequest}>
@@ -485,8 +716,10 @@ export default function MapScreen() {
           </View>
         </View>
       </Modal>
+  
     </SafeAreaView>
   );
+  
 }
 
 const styles = StyleSheet.create({
@@ -607,4 +840,58 @@ const styles = StyleSheet.create({
   },
   friendText: { color: '#fff', fontSize: 16 },
   checkMark: { color: '#4CAF50', fontSize: 16, fontWeight: 'bold' },
+  starRatingContainer: {
+    marginTop: 12,
+  },
+  
+  imagePickerButton: {
+    backgroundColor: '#4f0c2e',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignSelf: 'center',
+    marginTop: 10,
+  },
+  
+  imagePickerButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  galleryButton: {
+    backgroundColor: '#4f0c2e', // Tu color principal
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 10,
+  }, 
+  placeImage: {
+    width: '100%',
+    height: 200,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+  },
+  modalTitleM: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginVertical: 8,
+    textAlign: 'center',
+  },
+  modalDescription: {
+    fontSize: 16,
+    color: '#ccc',
+    marginVertical: 4,
+    textAlign: 'center',
+    paddingHorizontal: 10,
+  },
+  modalRating: {
+    fontSize: 16,
+    color: '#FFD700',
+    marginBottom: 16,
+    textAlign: 'center',
+  },   
+  
 });

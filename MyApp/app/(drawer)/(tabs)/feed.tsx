@@ -118,19 +118,15 @@ export default function FeedScreen() {
   const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  
+
 
   useEffect(() => {
     const fetchCurrentUserData = async () => {
-      const user = getAuth().currentUser;
-      console.log('🔎 Intentando obtener usuario autenticado:', user);
-  
+      const user = getAuth().currentUser;  
       if (user) {
         setCurrentUserId(user.uid);
   
-        const userDoc = await getDoc(doc(firestore, 'users', user.uid));
-        console.log('📄 Documento de usuario Firestore:', userDoc.exists() ? userDoc.data() : 'No existe');
-  
+        const userDoc = await getDoc(doc(firestore, 'users', user.uid));  
         if (userDoc.exists()) {
           setCurrentUserData(userDoc.data());
         }
@@ -215,9 +211,7 @@ export default function FeedScreen() {
         const universityFiltered = loadedPosts.filter((post) => 
           post.user.university === myUniversity
         );
-        
-        console.log(friendFiltered);
-    
+            
         setFriendPosts(friendFiltered);
         setUniversityPosts(universityFiltered);
     
