@@ -24,17 +24,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
 
-type Place = {
-  id: string;
-  title: string;
-  description: string;
-  geoPoint: { latitude: number; longitude: number };
-  type: string[];
-  imageUrl: string;
-  createdBy: string;
-  rating: { userId: string; stars: number }[];
-};
-
 
 const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
 
@@ -59,6 +48,20 @@ export default function MapScreen() {
   const [manualMarkerRating, setManualMarkerRating] = useState(0);
   const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
   const [placeModalVisible, setPlaceModalVisible] = useState(false);
+  const [placeOwner, setPlaceOwner] = useState<{ name: string; photo: any } | null>(null);
+
+
+
+  type location = {
+    id: string;
+    title: string;
+    description: string;
+    geoPoint: { latitude: number; longitude: number };
+    type: string[];
+    imageUrl: string;
+    createdBy: string;
+    rating: { userId: string; stars: number }[];
+  };
 
   //Subir imgs a storage
   const uploadImages = async (uris: string[]) => {
@@ -74,6 +77,30 @@ export default function MapScreen() {
     }
     return urls;
   };
+
+  const fetchPlaceOwner = async (userId: string) => {
+    try {
+      const userDoc = await getDoc(doc(firestore, 'users', userId));
+      if (userDoc.exists()) {
+        const userInfo = userDoc.data();
+        const ownerData = {
+          name: userInfo.name || 'Usuario sin nombre',
+          photo: userInfo.photo
+            ? (userInfo.photo.startsWith('data:')
+                ? { uri: userInfo.photo }
+                : { uri: userInfo.photo })
+            : require('../../../assets/images/img7.jpg'), // Foto default local si no tiene
+        };
+        setPlaceOwner(ownerData);
+      } else {
+        console.log('No se encontró usuario');
+        setPlaceOwner(null);
+      }
+    } catch (error) {
+      console.error(`❌ Error cargando usuario ${userId}:`, error);
+      setPlaceOwner(null);
+    }
+  };  
   
   //auth y amigos
   useEffect(() => {
@@ -277,6 +304,7 @@ export default function MapScreen() {
             type: data.type,
             imageUrl: data.imageUrl,
             rating: data.rating || [],
+
           };
         });
         setLocations(loadedLocations);
@@ -495,10 +523,32 @@ export default function MapScreen() {
           description={place.description}
           pinColor={getPinColor(place.createdBy)}
           onPress={() => {
+            fetchPlaceOwner(place.createdBy);
             setSelectedPlace(place);
             setPlaceModalVisible(true);
           }}
-        />
+        >
+           <View style={{
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: 'white',
+      backgroundColor: '#eee',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <Image
+        source={{ uri: place.imageUrl }}
+        style={{ width: '100%', height: '100%' }}
+        resizeMode="cover"
+      />
+      </View>
+  </Marker>
+        
+
+
       ))}
   
           {/* Marker de raite */}
@@ -568,11 +618,22 @@ export default function MapScreen() {
         </View>
       </Modal>
      {/* Modal Consultar Lugar */}
-      <Modal visible={placeModalVisible} transparent animationType="slide">
+          <Modal visible={placeModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             {selectedPlace && (
-              <>
+              <ScrollView contentContainerStyle={styles.modalContent}>
+                {placeOwner && (
+                  <View style={styles.ownerInfoContainer}>
+                    <Image
+                      source={placeOwner.photo}
+                      style={styles.ownerAvatar}
+                      resizeMode="cover"
+                    />
+                    <Text style={styles.ownerName}>{placeOwner.name}</Text>
+                  </View>
+                )}
+
                 {selectedPlace.imageUrl ? (
                   <Image
                     source={{ uri: selectedPlace.imageUrl }}
@@ -582,10 +643,10 @@ export default function MapScreen() {
                 ) : (
                   <Text style={styles.modalTitleM}>Sin imagen disponible</Text>
                 )}
-                
-                <Text style={styles.modalTitleM}>{selectedPlace.title}</Text>
+
+                <Text style={styles.modalTitle}>{selectedPlace.title}</Text>
                 <Text style={styles.modalDescription}>{selectedPlace.description}</Text>
-                
+
                 <Text style={styles.modalRating}>
                   {selectedPlace.rating && selectedPlace.rating.length > 0
                     ? `⭐ ${selectedPlace.rating[0].stars} estrellas`
@@ -593,16 +654,17 @@ export default function MapScreen() {
                 </Text>
 
                 <TouchableOpacity
-                  style={[styles.modalButton, styles.modalButtonCancel]}
+                  style={styles.modalButton}
                   onPress={() => setPlaceModalVisible(false)}
                 >
                   <Text style={styles.modalButtonText}>Cerrar</Text>
                 </TouchableOpacity>
-              </>
+              </ScrollView>
             )}
           </View>
         </View>
       </Modal>
+
 
   
       {/* Modal Confirmar Raite */}
@@ -867,31 +929,55 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginVertical: 10,
   }, 
+  ownerInfoContainer: {
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  ownerAvatar: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: '#4f0c2e',
+    backgroundColor: '#ddd',
+  },
+  ownerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
+  },
   placeImage: {
     width: '100%',
     height: 200,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
+    borderRadius: 12,
+    marginBottom: 15,
   },
-  modalTitleM: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginVertical: 8,
-    textAlign: 'center',
-  },
+
   modalDescription: {
-    fontSize: 16,
-    color: '#ccc',
-    marginVertical: 4,
+    fontSize: 15,
+    color: '#555',
+    marginBottom: 15,
     textAlign: 'center',
     paddingHorizontal: 10,
   },
   modalRating: {
     fontSize: 16,
-    color: '#FFD700',
-    marginBottom: 16,
+    color: '#fff',
+    marginBottom: 20,
+  },
+  modalContent: {
+    alignItems: 'center',
+    paddingBottom: 20,
+  },
+  modalTitleM: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4f0c2e',
+    marginBottom: 10,
     textAlign: 'center',
-  },   
+  },
+  
   
 });
