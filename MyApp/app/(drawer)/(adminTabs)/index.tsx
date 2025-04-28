@@ -7,12 +7,7 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <Feather name="menu" size={24} color="#fff" style={styles.menuIcon} />
-        <Text style={styles.headerTitle}>Admin</Text>
-        <View style={styles.emptySpace} />
-      </View>
+
       
       {/* Subtitle */}
       <Text style={styles.subtitle}>Gestión de Estudiantes</Text>
@@ -59,9 +54,11 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: '#b388ff',
-    fontSize: 16,
+    marginTop: 20,
+    fontSize: 24,
     textAlign: 'center',
     marginBottom: 20,
+    fontWeight: 'bold',
   },
   card: {
     backgroundColor: '#1a1a1a',
