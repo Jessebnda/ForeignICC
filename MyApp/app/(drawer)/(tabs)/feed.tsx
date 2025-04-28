@@ -118,7 +118,7 @@ export default function FeedScreen() {
   const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-
+  
 
   useEffect(() => {
     const fetchCurrentUserData = async () => {
