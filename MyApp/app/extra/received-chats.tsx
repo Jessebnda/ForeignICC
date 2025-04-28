@@ -1,22 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { FlatList, View, Text, Image, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query as firestoreQuery, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { ref, query as dbQuery, orderByChild, get, onValue } from 'firebase/database';
 import { getAuth } from 'firebase/auth';
-import { firestore } from '../../firebase';
+import { firestore, database } from '../../firebase';
 import { Ionicons } from '@expo/vector-icons';
 import { useUser } from '../../context/UserContext';
 
 // Interfaces
 interface ChatRequest {
-  id: string;
-  userId: string;
-  userName: string;
-  userPhoto?: string;
-  mentorId: string;
-  message?: string;
-  timestamp: any;
-  read: boolean;
+  id: string;           // chatId
+  userId: string;       // ID del usuario que envía el mensaje
+  userName: string;     // Nombre del usuario
+  userPhoto?: string;   // Foto del usuario
+  lastMessage: string;  // Último mensaje
+  timestamp: number;    // Timestamp del último mensaje
+  unreadCount: number;  // Contador de mensajes no leídos
+}
+
+interface ChatMessage {
+  from: string;
+  text: string;
+  timestamp: number;
+  read?: boolean;
 }
 
 const defaultUserImage = require('../../assets/images/img7.jpg');
@@ -31,37 +38,98 @@ export default function ReceivedChatsScreen() {
   const auth = getAuth();
   const currentUser = auth.currentUser;
 
-  // Cargar chats recibidos
+  // Cargar chats desde Realtime Database
   useEffect(() => {
     const fetchReceivedChats = async () => {
-      if (!currentUser || !userProfile?.isMentor) return;
+      if (!currentUser) return;
 
       try {
         setLoading(true);
-        // Consultar mensajes donde el usuario actual (mentor) es el destinatario
-        const q = query(
-          collection(firestore, 'mentorChats'),
-          where('mentorId', '==', currentUser.uid),
-          orderBy('timestamp', 'desc')
+        
+        // Obtenemos todos los mensajes
+        const messagesRef = ref(database, 'messages');
+        const snapshot = await get(messagesRef);
+        
+        if (!snapshot.exists()) {
+          setChats([]);
+          setFilteredChats([]);
+          setLoading(false);
+          return;
+        }
+
+        const allChats = snapshot.val();
+        const chatIds = Object.keys(allChats);
+        
+        // Filtramos los chats donde participa el usuario actual
+        const mentorChatIds = chatIds.filter(chatId => 
+          chatId.includes(currentUser.uid)
         );
         
-        const snapshot = await getDocs(q);
-        const chatsList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data() as any
-        })) as ChatRequest[];
-
-        setChats(chatsList);
-        setFilteredChats(chatsList);
+        // Para cada chat, obtenemos la información necesaria
+        const chatPromises = mentorChatIds.map(async (chatId) => {
+          // Obtenemos el ID del otro usuario (no el mentor)
+          const [user1, user2] = chatId.split('_');
+          const otherUserId = user1 === currentUser.uid ? user2 : user1;
+          
+          // Obtenemos la información del otro usuario desde Firestore
+          const userDoc = await getDoc(doc(firestore, 'users', otherUserId));
+          const userData = userDoc.exists() ? userDoc.data() : null;
+          
+          // Obtenemos los mensajes del chat
+          const chatMessages = allChats[chatId];
+          const messagesArray = chatMessages ? Object.values(chatMessages) as ChatMessage[] : [];
+          
+          // Ordenamos por timestamp y obtenemos el último mensaje
+          const sortedMessages = messagesArray.sort((a: any, b: any) => 
+            (b.timestamp || 0) - (a.timestamp || 0)
+          );
+          
+          const lastMessage = sortedMessages.length > 0 ? sortedMessages[0] : null;
+          
+          // Contamos mensajes no leídos (de otros usuarios y no leídos)
+          const unreadCount = sortedMessages.filter((msg: any) => 
+            msg.from !== currentUser.uid && !msg.read
+          ).length;
+          
+          return {
+            id: chatId,
+            userId: otherUserId,
+            userName: userData?.name || userData?.displayName || 'Usuario',
+            userPhoto: userData?.photo || userData?.photoURL,
+            lastMessage: lastMessage?.text || 'Nuevo chat',
+            timestamp: lastMessage?.timestamp || Date.now(),
+            unreadCount
+          } as ChatRequest;
+        });
+        
+        const userChats = await Promise.all(chatPromises);
+        
+        // Ordenar por timestamp descendente (más reciente primero)
+        const sortedChats = userChats.sort((a, b) => b.timestamp - a.timestamp);
+        
+        setChats(sortedChats);
+        setFilteredChats(sortedChats);
       } catch (error) {
-        console.error('Error al cargar chats recibidos:', error);
+        console.error('Error al cargar chats:', error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchReceivedChats();
-  }, [currentUser, userProfile]);
+    
+    // También configuramos un listener para actualizar en tiempo real
+    if (currentUser) {
+      const messagesRef = ref(database, 'messages');
+      const unsubscribe = onValue(messagesRef, () => {
+        fetchReceivedChats();
+      });
+      
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, [currentUser]);
 
   // Filtrar chats cuando cambia la búsqueda
   useEffect(() => {
@@ -69,7 +137,7 @@ export default function ReceivedChatsScreen() {
       const lowercasedQuery = searchQuery.toLowerCase();
       const filtered = chats.filter(chat =>
         chat.userName?.toLowerCase().includes(lowercasedQuery) ||
-        chat.message?.toLowerCase().includes(lowercasedQuery)
+        chat.lastMessage?.toLowerCase().includes(lowercasedQuery)
       );
       setFilteredChats(filtered);
     } else {
@@ -126,7 +194,10 @@ export default function ReceivedChatsScreen() {
         data={filteredChats}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TouchableOpacity style={[styles.card, !item.read && styles.unreadCard]} onPress={() => goToChat(item)}>
+          <TouchableOpacity 
+            style={[styles.card, item.unreadCount > 0 && styles.unreadCard]} 
+            onPress={() => goToChat(item)}
+          >
             <Image 
               source={renderAvatar(item.userPhoto)} 
               style={styles.avatar} 
@@ -134,11 +205,17 @@ export default function ReceivedChatsScreen() {
             <View style={styles.userInfo}>
               <Text style={styles.name}>{item.userName || 'Usuario sin nombre'}</Text>
               <Text style={styles.message} numberOfLines={1} ellipsizeMode="tail">
-                {item.message || 'Nuevo mensaje'}
+                {item.lastMessage || 'Nuevo mensaje'}
               </Text>
             </View>
             <View style={styles.rightContent}>
-              {!item.read && <View style={styles.unreadBadge} />}
+              {item.unreadCount > 0 && (
+                <View style={styles.unreadBadge}>
+                  <Text style={styles.unreadCount}>
+                    {item.unreadCount > 9 ? '9+' : item.unreadCount}
+                  </Text>
+                </View>
+              )}
               <Ionicons name="chatbubble-outline" size={24} color="#b388fc" style={styles.chatIcon} />
             </View>
           </TouchableOpacity>
@@ -158,6 +235,7 @@ export default function ReceivedChatsScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Estilos existentes...
   container: { 
     flex: 1, 
     backgroundColor: '#121212',
@@ -234,11 +312,18 @@ const styles = StyleSheet.create({
     marginLeft: 8
   },
   unreadBadge: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#bb86fc',
-    marginBottom: 6
+    marginBottom: 6,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  unreadCount: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold'
   },
   emptyContainer: {
     padding: 20,
