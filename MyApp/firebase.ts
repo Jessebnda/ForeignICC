@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getDatabase } from "firebase/database"; // Import Realtime Database
  // @ts-ignore
  import { getReactNativePersistence, initializeAuth } from "firebase/auth";
  import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage'
@@ -10,6 +11,7 @@ import { getStorage } from "firebase/storage";
  const firebaseConfig = {
   apiKey: "AIzaSyBLVmPAr7tG27sSrMCdhfhvgaNTwlfeuqg",
   authDomain: "foreign-e6040.firebaseapp.com",
+  databaseURL:"https://foreign-e6040-default-rtdb.firebaseio.com/", // Ensure this is correct
   projectId: "foreign-e6040",
   storageBucket: "foreign-e6040.firebasestorage.app",
   messagingSenderId: "497729458678",
@@ -25,5 +27,6 @@ export const auth = initializeAuth(app, {
 });
 export const firestore = getFirestore(app);
 export const storage = getStorage(app);
+export const database = getDatabase(app); // Initialize and export Realtime Database
 
 export default app;

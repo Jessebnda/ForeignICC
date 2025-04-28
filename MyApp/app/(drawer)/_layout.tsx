@@ -1,5 +1,6 @@
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { Drawer } from "expo-router/drawer";
+import { Drawer } from 'expo-router/drawer';
+import { Ionicons } from '@expo/vector-icons'; // Or your icon library
 import { View, Text, Pressable, StyleSheet, TouchableOpacity, Switch, Image } from "react-native";
 import { useRouter, useNavigation } from "expo-router";
 import { DrawerActions } from "@react-navigation/native";
@@ -35,7 +36,7 @@ const customTitles: Record<string, string> = {
   "settings/index": "Configuración",
 };
 
-export default function Layout() {
+export default function DrawerLayout() {
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,7 +63,20 @@ export default function Layout() {
             ),
           })}
           drawerContent={() => <CustomDrawerContent userId={userId} />}
-        />
+        >
+          {/* ... existing screens ... */}
+          <Drawer.Screen
+            name="messages" // This will look for app/(drawer)/messages.tsx
+            options={{
+              drawerLabel: 'Mensajes',
+              title: 'Mis Mensajes',
+              drawerIcon: ({ size, color }) => (
+                <Ionicons name="chatbubbles-outline" size={size} color={color} />
+              ),
+            }}
+          />
+          {/* ... other existing screens ... */}
+        </Drawer>
       )}
     </GestureHandlerRootView>
   );
@@ -106,14 +120,14 @@ function CustomDrawerContent({ userId }: { userId: string }) {
 
   const menuItems: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
     { title: "User", icon: "account", path: '/(tabs)/profile' },
-    { title: "Messages", icon: "message", path: '/(extra)/AmigosScreen' },
+    { title: "Messages", icon: "message", path: 'extra/messages' }, 
     { title: "Friend request", icon: "account-plus", path: '/extra/AmigosScreen' },
     { title: "Configuración", icon: "cog", path: '/settings' },
   ];
 
   const menuItemsAdmin: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
     { title: "User", icon: "account", path: '/(tabs)/profile' },
-    { title: "Messages", icon: "message", path: '/(extra)/AmigosScreen' },
+    { title: "Messages", icon: "message", path: '/extra/messages' }, 
     { title: "Friend request", icon: "account-plus", path: '/extra/AmigosScreen' },
     { title: "Configuración", icon: "cog", path: '/settings' },
     { title: "Dashboard", icon: "powershell", path: '/(adminTabs)' },
