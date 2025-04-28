@@ -94,11 +94,28 @@ export default function ForumScreen() {
     });
   };
 
-  const renderAvatar = (source: string) => {
-    if (source && (source.startsWith('http') || source.startsWith('data:'))) {
-      return { uri: source };
+  const renderAvatar = (source: any) => {
+    try {
+      // Si es directamente un objeto con uri, retornarlo
+      if (source && typeof source === 'object' && source.uri) {
+        return source;
+      }
+      
+      // Si es un string válido con http o data:
+      if (source && typeof source === 'string' && 
+          (source.startsWith('http') || source.startsWith('data:'))) {
+        // En iOS antiguo, a veces es necesario añadir un cache buster
+        const cacheBuster = `?t=${Date.now()}`;
+        const imageUri = source.includes('?') ? source : source + cacheBuster;
+        return { uri: imageUri };
+      }
+      
+      // Respaldo: imagen por defecto
+      return require('../../../assets/images/img7.jpg');
+    } catch (e) {
+      console.log('Error renderizando avatar:', e);
+      return require('../../../assets/images/img7.jpg');
     }
-    return require('../../../assets/images/img7.jpg');
   };
 
   if (loading && !refreshing) {
