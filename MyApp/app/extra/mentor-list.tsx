@@ -89,7 +89,7 @@ export default function MentorListScreen() {
   // Actualizar el método goToChat para usar el formato correcto de parámetros
   const goToChat = (mentor: Mentor) => {
     router.push({
-      pathname: '/extra/mentor-chat',  // Asegúrate que esta sea la ruta correcta
+      pathname: '/extra/chat',  // Asegúrate que esta sea la ruta correcta
       params: { 
         friendId: mentor.id,
         friendName: mentor.name || 'Mentor',

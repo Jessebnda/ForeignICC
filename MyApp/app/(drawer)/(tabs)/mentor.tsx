@@ -1,23 +1,67 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import MentorListScreen from '../../extra/mentor-list';
 import ChatbotScreen from '../../extra/chatbot';
+import ReceivedChatsScreen from '../../extra/received-chats'; // Nuevo componente
+import { useUser } from '../../../context/UserContext';
 
 export default function MentorScreen() {
-  const [activeTab, setActiveTab] = useState<'mentores' | 'chatbot'>('mentores');
+  const { userProfile } = useUser();
+  const [isMentor, setIsMentor] = useState(false);
+  const [activeTab, setActiveTab] = useState<'mentores' | 'recibidos' | 'chatbot'>('mentores');
+  
+  // Verificar si el usuario es mentor
+  useEffect(() => {
+    if (userProfile?.isMentor === true) {
+      setIsMentor(true);
+    } else {
+      // Si el usuario no es mentor y está en la pestaña recibidos, cambiar a mentores
+      if (activeTab === 'recibidos') {
+        setActiveTab('mentores');
+      }
+    }
+  }, [userProfile]);
 
   return (
     <View style={styles.container}>
       <View style={styles.tabContainer}>
-        <TouchableOpacity style={[styles.tab, activeTab === 'mentores' && styles.activeTab]} onPress={() => setActiveTab('mentores')}>
+        <TouchableOpacity 
+          style={[
+            styles.tab, 
+            activeTab === 'mentores' && styles.activeTab,
+            // Ajustar anchura dependiendo de cuántas tabs hay
+            { flex: isMentor ? 1 : 1.5 }
+          ]} 
+          onPress={() => setActiveTab('mentores')}
+        >
           <Text style={styles.tabText}>Mentores</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tab, activeTab === 'chatbot' && styles.activeTab]} onPress={() => setActiveTab('chatbot')}>
+        
+        {isMentor && (
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'recibidos' && styles.activeTab]} 
+            onPress={() => setActiveTab('recibidos')}
+          >
+            <Text style={styles.tabText}>Recibidos</Text>
+          </TouchableOpacity>
+        )}
+        
+        <TouchableOpacity 
+          style={[
+            styles.tab, 
+            activeTab === 'chatbot' && styles.activeTab,
+            { flex: isMentor ? 1 : 1.5 }
+          ]} 
+          onPress={() => setActiveTab('chatbot')}
+        >
           <Text style={styles.tabText}>Chatbot</Text>
         </TouchableOpacity>
       </View>
+      
       <View style={styles.content}>
-        {activeTab === 'mentores' ? <MentorListScreen /> : <ChatbotScreen />}
+        {activeTab === 'mentores' && <MentorListScreen />}
+        {activeTab === 'recibidos' && isMentor && <ReceivedChatsScreen />}
+        {activeTab === 'chatbot' && <ChatbotScreen />}
       </View>
     </View>
   );

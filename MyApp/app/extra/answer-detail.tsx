@@ -1,79 +1,224 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Image, ActivityIndicator, RefreshControl } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { doc, getDoc, collection, addDoc, onSnapshot, query, orderBy, Timestamp, updateDoc, increment } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { firestore } from '../../firebase';
+import { useUser } from '../../context/UserContext';
+
+interface ForumUser {
+  id: string;
+  name: string;
+  photo: string;
+}
+
+interface ForumAnswer {
+  id: string;
+  content: string;
+  timestamp: any;
+  user: ForumUser;
+  likes: number;
+}
+
+interface ForumComment {
+  id: string;
+  content: string;
+  timestamp: any;
+  user: ForumUser;
+  likes: number;
+}
 
 export default function AnswerDetailScreen() {
   const router = useRouter();
-  const { answer: answerParam } = useLocalSearchParams();
-  const answer = answerParam ? JSON.parse(answerParam as string) : {
-    content: '',
-    comments: [],
-    user: { name: 'Usuario', image: require('../../assets/images/img7.jpg') },
-    timestamp: 'Hace 2 horas',
-    likes: 0
-  };
-
-  const [comments, setComments] = useState<any[]>(answer.comments || []);
+  const { questionId, answerId } = useLocalSearchParams();
+  const [answer, setAnswer] = useState<ForumAnswer | null>(null);
+  const [comments, setComments] = useState<ForumComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLiked, setIsLiked] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [answerLoading, setAnswerLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const auth = getAuth();
+  const user = auth.currentUser;
+  const { userProfile } = useUser();
 
-  const addComment = () => {
-    if (!newComment.trim()) return;
-    const comment = {
-      id: `com-${Date.now()}`,
-      content: newComment.trim(),
-      user: { name: 'Tú', image: require('../../assets/images/img7.jpg') },
-      timestamp: 'Ahora',
-      likes: 0
+  // Cargar la respuesta
+  useEffect(() => {
+    if (!questionId || !answerId) return;
+    
+    const fetchAnswer = async () => {
+      try {
+        setAnswerLoading(true);
+        const answerDoc = await getDoc(
+          doc(firestore, 'forumQuestions', questionId as string, 'answers', answerId as string)
+        );
+        
+        if (answerDoc.exists()) {
+          setAnswer({ id: answerDoc.id, ...answerDoc.data() } as ForumAnswer);
+        }
+      } catch (error) {
+        console.error('Error al obtener respuesta:', error);
+      } finally {
+        setAnswerLoading(false);
+      }
     };
-    setComments([comment, ...comments]);
-    setNewComment('');
+    
+    fetchAnswer();
+  }, [questionId, answerId]);
+  
+  // Cargar los comentarios
+  useEffect(() => {
+    if (!questionId || !answerId) return;
+    
+    const q = query(
+      collection(firestore, 'forumQuestions', questionId as string, 'answers', answerId as string, 'comments'),
+      orderBy('timestamp', 'desc')
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loadedComments = snapshot.docs.map(doc => 
+        ({ id: doc.id, ...doc.data() }) as ForumComment
+      );
+      setComments(loadedComments);
+      setLoading(false);
+      setRefreshing(false);
+    });
+    
+    return () => unsubscribe();
+  }, [questionId, answerId]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Las recargas se manejan con el onSnapshot
   };
 
-  const toggleLike = () => {
-    setIsLiked(!isLiked);
+  const addComment = async () => {
+    if (!newComment.trim() || !user || !questionId || !answerId) return;
+    
+    try {
+      const comment = {
+        content: newComment.trim(),
+        timestamp: Timestamp.now(),
+        user: {
+          id: user.uid,
+          name: userProfile?.name || user.displayName || 'Usuario sin nombre',
+          photo: userProfile?.photo || '',
+        },
+        likes: 0
+      };
+      
+      // Añadir el comentario
+      await addDoc(
+        collection(firestore, 'forumQuestions', 
+          questionId as string, 'answers', answerId as string, 'comments'),
+        comment
+      );
+      
+      // Incrementar el contador de comentarios
+      await updateDoc(
+        doc(firestore, 'forumQuestions', questionId as string, 'answers', answerId as string),
+        { commentCount: increment(1) }
+      );
+      
+      setNewComment('');
+    } catch (error) {
+      console.error('Error al añadir comentario:', error);
+    }
   };
 
-  const renderComment = ({ item }: { item: any }) => (
+  const toggleLike = async () => {
+    if (!user || !questionId || !answerId || !answer) return;
+    
+    try {
+      const answerRef = doc(
+        firestore, 'forumQuestions', questionId as string, 'answers', answerId as string
+      );
+      
+      await updateDoc(answerRef, {
+        likes: isLiked ? (answer.likes || 1) - 1 : (answer.likes || 0) + 1
+      });
+      
+      setIsLiked(!isLiked);
+      setAnswer(prev => 
+        prev ? {...prev, likes: isLiked ? (prev.likes - 1) : (prev.likes + 1)} : null
+      );
+    } catch (error) {
+      console.error('Error al actualizar like:', error);
+    }
+  };
+
+  const renderAvatar = (source: string) => {
+    if (source && (source.startsWith('http') || source.startsWith('data:'))) {
+      return { uri: source };
+    }
+    return require('../../assets/images/img7.jpg');
+  };
+
+  const renderComment = ({ item }: { item: ForumComment }) => (
     <View style={styles.commentCard}>
       <View style={styles.commentHeader}>
         <View style={styles.userInfo}>
-          <Image source={item.user.image} style={styles.avatar} />
+          <Image source={renderAvatar(item.user.photo)} style={styles.avatar} />
           <View>
             <Text style={styles.userName}>{item.user.name}</Text>
-            <Text style={styles.timestamp}>{item.timestamp}</Text>
+            <Text style={styles.timestamp}>
+              {item.timestamp?.toDate ? 
+                new Date(item.timestamp.toDate()).toLocaleString() : 
+                'Ahora'}
+            </Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-horizontal" size={20} color="#888" />
-        </TouchableOpacity>
       </View>
       <Text style={styles.commentContent}>{item.content}</Text>
       <View style={styles.commentFooter}>
         <TouchableOpacity style={styles.statButton}>
-          <Ionicons name="heart-outline" size={16} color="#888" />
-          <Text style={styles.statText}>{item.likes}</Text>
+          <Ionicons name="heart-outline" size={18} color="#888" />
+          <Text style={styles.statText}>{item.likes || 0}</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
+  if (answerLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#bb86fc" />
+        <Text style={styles.loadingText}>Cargando respuesta...</Text>
+      </View>
+    );
+  }
+
+  if (!answer) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Ionicons name="alert-circle-outline" size={64} color="#e91e63" />
+        <Text style={styles.errorText}>No se encontró la respuesta</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>Volver a la pregunta</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.answerHeader}>
         <View style={styles.userInfo}>
-          <Image source={answer.user.image} style={styles.avatar} />
+          <Image source={renderAvatar(answer.user.photo)} style={styles.avatar} />
           <View>
             <Text style={styles.userName}>{answer.user.name}</Text>
-            <Text style={styles.timestamp}>{answer.timestamp}</Text>
+            <Text style={styles.timestamp}>
+              {answer.timestamp?.toDate ? 
+                new Date(answer.timestamp.toDate()).toLocaleString() : 
+                'Hace un momento'}
+            </Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-horizontal" size={20} color="#888" />
-        </TouchableOpacity>
       </View>
+      
       <Text style={styles.answerContent}>{answer.content}</Text>
+      
       <View style={styles.answerFooter}>
         <TouchableOpacity 
           style={[styles.likeButton, isLiked && styles.likeButtonActive]} 
@@ -85,7 +230,7 @@ export default function AnswerDetailScreen() {
             color={isLiked ? "#bb86fc" : "#888"} 
           />
           <Text style={[styles.likeText, isLiked && styles.likeTextActive]}>
-            {answer.likes + (isLiked ? 1 : 0)}
+            {answer.likes || 0}
           </Text>
         </TouchableOpacity>
       </View>
@@ -99,6 +244,19 @@ export default function AnswerDetailScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderComment}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator style={styles.loader} color="#bb86fc" size="small" />
+          ) : (
+            <View style={styles.emptyComments}>
+              <Text style={styles.emptyText}>Aún no hay comentarios</Text>
+              <Text style={styles.emptySuggestion}>¡Sé el primero en comentar!</Text>
+            </View>
+          )
+        }
       />
 
       <View style={styles.inputContainer}>
@@ -123,7 +281,37 @@ export default function AnswerDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#121212' 
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    color: '#fff',
+    marginTop: 16,
+    fontSize: 16,
+  },
+  errorText: {
+    color: '#e91e63',
+    fontSize: 18,
+    marginTop: 16,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  backButton: {
+    backgroundColor: '#333',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
   answerHeader: {
     padding: 16,
     borderBottomWidth: 1,
@@ -133,7 +321,6 @@ const styles = StyleSheet.create({
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12
   },
   avatar: {
     width: 40,
@@ -152,9 +339,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
     marginTop: 2
-  },
-  moreButton: {
-    padding: 4
   },
   answerContent: {
     fontSize: 16,
@@ -182,7 +366,7 @@ const styles = StyleSheet.create({
   },
   likeText: {
     color: '#888',
-    marginLeft: 4,
+    marginLeft: 6,
     fontSize: 14
   },
   likeTextActive: {
@@ -190,12 +374,17 @@ const styles = StyleSheet.create({
   },
   commentsHeader: {
     padding: 16,
-    backgroundColor: '#1e1e1e'
+    backgroundColor: '#1e1e1e',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
   },
   commentsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff'
+  },
+  loader: {
+    marginVertical: 20,
   },
   listContent: {
     padding: 16
@@ -221,7 +410,8 @@ const styles = StyleSheet.create({
   },
   commentFooter: {
     flexDirection: 'row',
-    alignItems: 'center'
+    alignItems: 'center',
+    marginTop: 8,
   },
   statButton: {
     flexDirection: 'row',
@@ -238,27 +428,41 @@ const styles = StyleSheet.create({
     padding: 12,
     borderTopWidth: 1,
     borderColor: '#333',
-    backgroundColor: '#1e1e1e'
+    backgroundColor: '#1a1a1a'
   },
   input: {
     flex: 1,
-    backgroundColor: '#333',
+    backgroundColor: '#2a2a2a',
     borderRadius: 20,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     color: '#fff',
     marginRight: 8,
-    maxHeight: 100
+    maxHeight: 100,
+    fontSize: 16,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#bb86fc',
     justifyContent: 'center',
     alignItems: 'center'
   },
   sendButtonDisabled: {
     backgroundColor: '#333'
+  },
+  emptyComments: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: '#fff',
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  emptySuggestion: {
+    color: '#888',
+    fontSize: 14,
   },
 });
