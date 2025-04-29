@@ -12,7 +12,6 @@ import {
   SafeAreaView,
   ActivityIndicator 
 } from 'react-native';
-import MapView, { Marker, LatLng } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { firestore } from '../../../firebase';
 import { getAuth } from 'firebase/auth';
@@ -22,7 +21,11 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../../firebase';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
-import * as ImageManipulator from 'expo-image-manipulator';
+import { database } from '../../../firebase'; 
+import { set, ref as DatabaseRef, remove, onValue } from 'firebase/database';
+import MapView, { Marker, LatLng, Polyline } from 'react-native-maps';
+
+
 
 
 const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
@@ -49,18 +52,14 @@ export default function MapScreen() {
   const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
   const [placeModalVisible, setPlaceModalVisible] = useState(false);
   const [placeOwner, setPlaceOwner] = useState<{ name: string; photo: any } | null>(null);
+  const [friendRaiteRequests, setFriendRaiteRequests] = useState<FriendRaiteRequest[]>([]);
+  const [raiteAlertModalVisible, setRaiteAlertModalVisible] = useState(false);
+  const [selectedFriendRaite, setSelectedFriendRaite] = useState<{ friendId: string; friendName: string; to: LatLng } | null>(null);
 
-
-
-  type location = {
-    id: string;
-    title: string;
-    description: string;
-    geoPoint: { latitude: number; longitude: number };
-    type: string[];
-    imageUrl: string;
-    createdBy: string;
-    rating: { userId: string; stars: number }[];
+  type FriendRaiteRequest = {
+    friendId: string;
+    friendName: string;
+    to: LatLng;
   };
 
   //Subir imgs a storage
@@ -77,7 +76,7 @@ export default function MapScreen() {
     }
     return urls;
   };
-
+ 
   const fetchPlaceOwner = async (userId: string) => {
     try {
       const userDoc = await getDoc(doc(firestore, 'users', userId));
@@ -257,14 +256,78 @@ export default function MapScreen() {
   const [raiteConfirmModalVisible, setRaisteConfirmModalVisible] = useState(false);
   const [friendSelectionModalVisible, setFriendSelectionModalVisible] = useState(false);
   type Friend = { id: string; name: string; };
-  const [dummyFriends] = useState<Friend[]>([
-    { id: '1', name: 'Amigo 1' },
-    { id: '2', name: 'Amigo 2' },
-  ]);
+  const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
 
-  const CENTER: LatLng = { latitude: 32.6245, longitude: -115.4523 };
+  const sendRaiteRequestRealtime = async () => {
+    const userId = currentUserId; 
+    if (!userId || !userLocation || !selectedRaitePlace) return;
+  
+    const raiteData = {
+      from: userLocation,
+      to: selectedRaitePlace,
+      timestamp: Date.now(),
+      status: 'pending',
+      selectedFriends: friends, 
+    };
+  
+    await set(DatabaseRef(database, `raiteRequests/${userId}`), raiteData);
+  };
 
+  const cancelRaiteRequestRealtime = async () => {
+    const userId = currentUserId;
+    if (!userId) return;
+    await remove(DatabaseRef(database, `raiteRequests/${userId}`));
+  };
+
+  //a ellos se les manda
+  useEffect(() => {
+    if (friendIds.length === 0) return;
+  
+    const unsubscribes = friendIds.map(friendId => {
+      const friendRef = DatabaseRef(database, `raiteRequests/${friendId}`);
+      return onValue(friendRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.status === 'pending') {
+          console.log(`Tu amigo ${friendId} está pidiendo raite a:`, data.to);
+        }
+      });
+    });
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [friendIds]);
+
+  useEffect(() => {
+    if (friendIds.length === 0) return;
+  
+    const unsubscribes = friendIds.map(friendId => {
+      const friendRequestRef = DatabaseRef(database, `raiteRequests/${friendId}`);
+      return onValue(friendRequestRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.status === 'pending') {
+          setFriendRaiteRequests(prev => {
+            const alreadyExists = prev.find(r => r.friendId === friendId);
+            if (alreadyExists) return prev;
+  
+            const friend = friends.find(f => f.id === friendId);
+            if (!friend) return prev;
+  
+            return [...prev, { friendId, friendName: friend.name, to: data.to }];
+          });
+        } else {
+          setFriendRaiteRequests(prev =>
+            prev.filter(r => r.friendId !== friendId)
+          );
+        }
+      });
+    });
+  
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [friendIds, friends]);
+  
   // Solicitar permisos y obtener la ubicación real con Expo Location
   useEffect(() => {
     (async () => {
@@ -285,38 +348,35 @@ export default function MapScreen() {
   useEffect(() => {
     setPendingTypes(confirmedTypes);
   }, []);
-
-  
+ 
+  // filtrar info de amigos
   useEffect(() => {
-    const fetchLocations = async () => {
+    const fetchFriendsData = async () => {
       try {
-        const querySnapshot = await getDocs(collection(firestore, 'mapLocations'));
-        const loadedLocations = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: data.locationId,
-            title: data.title,
-            description: data.description,
-            geoPoint: {
-              latitude: data.geoPoint.latitude,
-              longitude: data.geoPoint.longitude,
-            },
-            type: data.type,
-            imageUrl: data.imageUrl,
-            rating: data.rating || [],
-
-          };
-        });
-        setLocations(loadedLocations);
+        const friendsData: Friend[] = [];
+  
+        for (const friendId of friendIds) {
+          const friendDoc = await getDoc(doc(firestore, 'users', friendId));
+          if (friendDoc.exists()) {
+            const friendInfo = friendDoc.data();
+            friendsData.push({
+              id: friendId,
+              name: friendInfo.name || 'Usuario sin nombre',
+            });
+          }
+        }
+  
+        setFriends(friendsData);
       } catch (error) {
-        console.error('❌ Error al cargar lugares:', error);
-      } finally {
-        setIsLoading(false);
+        console.error('❌ Error cargando amigos:', error);
       }
     };
   
-    fetchLocations();
-  }, []);
+    if (friendIds.length > 0) {
+      fetchFriendsData();
+    }
+  }, [friendIds]);  
+
 
   const handleApplyFilters = () => {
     setConfirmedTypes([...pendingTypes]);
@@ -328,45 +388,6 @@ export default function MapScreen() {
     setHasChanges(true);
   };
 
-  /*const isFavoriteMarker = useCallback((id: string) => {
-    return favoriteMarkers.some(m => m.id === id);
-  }, [favoriteMarkers]);*/
-
-  /*const toggleFavorite = (marker: MarkerData) => {
-    if (isFavoriteMarker(marker.id)) {
-      setFavoriteMarkers(prev => prev.filter(m => m.id !== marker.id));
-    } else {
-      const favoriteMarker = { 
-        ...marker, 
-        category: 'favoritos', 
-        pinColor: '#bb86fc',
-        timestamp: Date.now()
-      };
-      setFavoriteMarkers(prev => [...prev, favoriteMarker]);
-    }
-  };*/
-
-  /*const handleAddManualMarker = () => {
-    if (!manualMarkerCoords || !manualMarkerName.trim()) {
-      Alert.alert('Error', 'Ingresa un nombre para el marcador.');
-      return;
-    }
-    const newMarker: MarkerData = {
-      id: `manual_${Date.now()}`,
-      coordinate: manualMarkerCoords,
-      name: manualMarkerName.trim(),
-      address: 'Lugar agregado manualmente',
-      category: 'favoritos',
-      pinColor: '#bb86fc',
-      timestamp: Date.now(),
-    };
-    setFavoriteMarkers(prev => [...prev, newMarker]);
-    setManualMarkerName('');
-    setManualMarkerCoords(null);
-    setModalVisible(false);
-    setIsAddingPlace(false);
-  };*/
- 
   //para lograr el long press
   const toggleAddingPlace = () => {
     setIsAddingPlace((prev) => !prev);
@@ -393,28 +414,46 @@ export default function MapScreen() {
     setFriendSelectionModalVisible(true);
   };
 
-  const cancelRaiteRequest = () => {
+  const cancelRaiteRequest = async () => {
+    try {
+      await cancelRaiteRequestRealtime(); // <<<< AQUI
+    } catch (error) {
+      console.error('❌ Error cancelando raite:', error);
+    }
+  
     setRaisteConfirmModalVisible(false);
     setSelectedRaitePlace(null);
   };
+  
 
   const toggleFriendSelection = (friendId: string) => {
-    setSelectedFriends(prev => prev.includes(friendId) ? prev.filter(id => id !== friendId) : [...prev, friendId]);
+    setSelectedFriends(prev => 
+      prev.includes(friendId)
+        ? prev.filter(id => id !== friendId)
+        : [...prev, friendId]
+    );
   };
 
-  const sendRaiteRequest = () => {
-    Alert.alert('Solicitud Enviada', `Se ha enviado la solicitud de raite a: ${selectedFriends.join(', ')}`);
+  const sendRaiteRequest = async () => {
+    try {
+      await sendRaiteRequestRealtime(); 
+      Alert.alert('Solicitud Enviada', `Se ha enviado la solicitud de raite a: ${friends.join(', ')}`);
+    } catch (error) {
+      console.error('❌ Error enviando raite:', error);
+      Alert.alert('Error', 'No se pudo enviar la solicitud de raite.');
+    }
+  
     setFriendSelectionModalVisible(false);
     setSelectedRaitePlace(null);
-    setSelectedFriends([]);
+    setFriends([]);
     setIsRaiteActive(false);
-  };
+  };   
 
   const toggleRaiteMode = () => {
     setIsRaiteActive(prev => !prev);
     if (isRaiteActive) {
       setSelectedRaitePlace(null);
-      setRaisteConfirmModalVisible(false);
+      setRaisteConfirmModalVisible(true);
       setFriendSelectionModalVisible(false);
     }
   };
@@ -442,7 +481,46 @@ export default function MapScreen() {
     if (confirmedTypes.length === 0) return true;
     return place.type.some((t: string) => confirmedTypes.includes(t));
   });
+
+  const renderRaiteConfirmModal = () => {
+    if (!raiteConfirmModalVisible || !selectedRaitePlace) return null;
   
+    return (
+      <Modal visible={raiteConfirmModalVisible} transparent animationType="slide">
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalContainer}>
+      <Text style={styles.modalTitle}>¿Confirmar Destino de Raite?</Text>
+
+      <View style={{ marginVertical: 20 }}>
+        <Text style={{ color: '#fff', textAlign: 'center' }}>
+          Latitud: {selectedRaitePlace?.latitude.toFixed(5)}
+        </Text>
+        <Text style={{ color: '#fff', textAlign: 'center' }}>
+          Longitud: {selectedRaitePlace?.longitude.toFixed(5)}
+        </Text>
+      </View>
+
+      <View style={styles.modalButtons}>
+        <TouchableOpacity
+          style={[styles.modalButton, styles.modalButtonCancel]}
+          onPress={cancelRaiteRequest}
+        >
+          <Text style={styles.modalButtonText}>Cancelar</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.modalButton}
+          onPress={confirmRaiteRequest}
+        >
+          <Text style={styles.modalButtonText}>Confirmar</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+    );
+  };
 
   // ─── CONDICIONAL PARA CARGAR EL MAPA ─────────────────────────────
   // Si no se ha obtenido la ubicación (o aún se está cargando), mostramos un indicador.
@@ -528,33 +606,50 @@ export default function MapScreen() {
             setPlaceModalVisible(true);
           }}
         >
-           <View style={{
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      overflow: 'hidden',
-      borderWidth: 2,
-      borderColor: 'white',
-      backgroundColor: '#eee',
-      alignItems: 'center',
-      justifyContent: 'center',
+      <View style={{
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        overflow: 'hidden',
+        borderWidth: 3,
+        borderColor: 'white',
+        backgroundColor: '#2a2a2a',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3,
+        elevation: 5,
     }}>
+      {place.imageUrl ? (
       <Image
         source={{ uri: place.imageUrl }}
         style={{ width: '100%', height: '100%' }}
         resizeMode="cover"
       />
+    ) : (
+      <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>
+        {place.title.charAt(0)}
+      </Text>
+    )}
       </View>
   </Marker>
         
-
-
       ))}
   
           {/* Marker de raite */}
           {isRaiteActive && selectedRaitePlace && (
             <Marker coordinate={selectedRaitePlace} pinColor="orange" title="Lugar para Raite" />
           )}
+
+        {selectedFriendRaite && userLocation && (
+          <Polyline
+            coordinates={[userLocation, selectedFriendRaite.to]}
+            strokeColor="#4f0c2e"
+            strokeWidth={4}
+          />
+        )}
         </MapView>
   
         {/* Loading si está cargando */}
@@ -567,58 +662,53 @@ export default function MapScreen() {
       </View>
 
       {/* Botón para "Agregar Lugar" */}
-      <TouchableOpacity style={styles.addButton} onPress={toggleAddingPlace}>
-      <Text style={styles.addButtonText}>
-        {isAddingPlace ? 'Cancelar' : 'Agregar Lugar'}
-      </Text>
-    </TouchableOpacity>
-
-      {/* Botón Pedir Raite */}
-      <TouchableOpacity style={styles.raiteButton} onPress={toggleRaiteMode}>
-        <Text style={styles.raiteButtonText}>
-          {isRaiteActive ? 'Cancelar Pedir Raite' : 'Pedir Raite'}
+      <TouchableOpacity 
+        style={[
+          styles.addButton, 
+          isAddingPlace && { backgroundColor: '#333', borderWidth: 2, borderColor: '#bb86fc' }
+        ]} 
+        onPress={toggleAddingPlace}
+      >
+        <Text style={[
+          styles.addButtonText,
+          isAddingPlace && { color: '#bb86fc' }
+        ]}>
+          {isAddingPlace ? 'Cancelar' : 'Agregar Lugar'}
         </Text>
       </TouchableOpacity>
+
+      {/* Botón Pedir Raite */}
+      <TouchableOpacity 
+        style={[
+          styles.raiteButton,
+          isRaiteActive && { backgroundColor: '#333', borderWidth: 2, borderColor: '#FF4081' }
+        ]} 
+        onPress={toggleRaiteMode}
+      >
+        {friendRaiteRequests.length > 0 && (
+          <TouchableOpacity
+          style={styles.badge}
+          onPress={() => {
+            if (friendRaiteRequests.length > 0) {
+              setSelectedFriendRaite(friendRaiteRequests[0]);
+              setRaiteAlertModalVisible(true);
+            }
+          }}
+        />
+        )}
+        <Text style={[
+          styles.raiteButtonText,
+          isRaiteActive && { color: '#FF4081' }
+        ]}>
+          {isRaiteActive ? 'Cancelar Raite' : 'Pedir Raite'}
+        </Text>
+      </TouchableOpacity>
+
   
       {/* --- MODALES --- */}
-  
-      {/* Modal Agregar Lugar */}
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Nombre del Lugar</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Ej. Mi Lugar"
-              placeholderTextColor="#888"
-              value={manualMarkerName}
-              onChangeText={setManualMarkerName}
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.modalButtonCancel]} 
-                onPress={() => {
-                  setModalVisible(false);
-                  setIsAddingPlace(false);
-                  setManualMarkerCoords(null);
-                  setManualMarkerName('');
-                }}
-              >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-  
-              <TouchableOpacity style={styles.addButton} onPress={toggleAddingPlace}>
-              <Text style={styles.addButtonText}>
-                {isAddingPlace ? 'Cancelar' : 'Agregar Lugar'}
-              </Text>
-            </TouchableOpacity>
-
-            </View>
-          </View>
-        </View>
-      </Modal>
-     {/* Modal Consultar Lugar */}
-          <Modal visible={placeModalVisible} transparent animationType="slide">
+      
+      {/* Modal Consultar Lugar */}
+      <Modal visible={placeModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             {selectedPlace && (
@@ -641,15 +731,28 @@ export default function MapScreen() {
                     resizeMode="cover"
                   />
                 ) : (
-                  <Text style={styles.modalTitleM}>Sin imagen disponible</Text>
+                  <View style={[styles.placeImage, { 
+                    backgroundColor: '#333', 
+                    alignItems: 'center', 
+                    justifyContent: 'center' 
+                  }]}>
+                    <Text style={{ color: '#888', fontSize: 16 }}>Sin imagen disponible</Text>
+                  </View>
                 )}
 
-                <Text style={styles.modalTitle}>{selectedPlace.title}</Text>
-                <Text style={styles.modalDescription}>{selectedPlace.description}</Text>
+                <Text style={styles.modalTitleM}>{selectedPlace.title}</Text>
+                
+                {selectedPlace.description ? (
+                  <Text style={styles.modalDescription}>{selectedPlace.description}</Text>
+                ) : (
+                  <Text style={[styles.modalDescription, { fontStyle: 'italic', color: '#888' }]}>
+                    Sin descripción
+                  </Text>
+                )}
 
                 <Text style={styles.modalRating}>
                   {selectedPlace.rating && selectedPlace.rating.length > 0
-                    ? `⭐ ${selectedPlace.rating[0].stars} estrellas`
+                    ? `★ ${selectedPlace.rating[0].stars} estrellas`
                     : 'Sin calificación'}
                 </Text>
 
@@ -698,21 +801,33 @@ export default function MapScreen() {
       </TouchableOpacity>
 
       {/* Preview de imagen si hay */}
-      {manualMarkerImageUri && (
-  <Image
-    source={{ uri: manualMarkerImageUri }}
-    style={{ width: '100%', height: 200, borderRadius: 8, marginVertical: 10 }}
-    resizeMode="cover"
-  />
-)}
+      {selectedImages.length > 0 && (
+      <View style={styles.selectedImagesContainer}>
+        {selectedImages.map((uri, index) => (
+          <Image
+            key={index}
+            source={{ uri }}
+            style={styles.selectedImagePreview}
+            resizeMode="cover"
+          />
+        ))}
+      </View>
+    )}
 
 
-      {/* Campo para poner estrellas (simple por ahora) */}
+      {/* Calificación por estrellas */}
       <Text style={styles.modalTitle}>Calificación:</Text>
-      <View style={{ flexDirection: 'row', justifyContent: 'center', marginVertical: 10 }}>
+      <View style={styles.starRatingContainer}>
         {[1, 2, 3, 4, 5].map((star) => (
-          <TouchableOpacity key={star} onPress={() => setManualMarkerRating(star)}>
-            <Text style={{ fontSize: 32, color: manualMarkerRating >= star ? '#FFD700' : '#888' }}>
+          <TouchableOpacity 
+            key={star} 
+            onPress={() => setStars(star)}
+            style={styles.starButton}
+          >
+            <Text style={[
+              styles.starIcon, 
+              { color: stars >= star ? '#FFD700' : '#444' }
+            ]}>
               ★
             </Text>
           </TouchableOpacity>
@@ -751,18 +866,18 @@ export default function MapScreen() {
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Selecciona amigos</Text>
             <ScrollView style={styles.friendsList}>
-              {dummyFriends.map((friend) => (
-                <TouchableOpacity 
-                  key={friend.id} 
-                  style={styles.friendItem} 
-                  onPress={() => toggleFriendSelection(friend.id)}
-                >
-                  <Text style={styles.friendText}>{friend.name}</Text>
-                  {selectedFriends.includes(friend.id) && (
-                    <Text style={styles.checkMark}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+            {friends.map((friend) => (
+            <TouchableOpacity 
+              key={friend.id} 
+              style={styles.friendItem} 
+              onPress={() => toggleFriendSelection(friend.id)}
+            >
+              <Text style={styles.friendText}>{friend.name}</Text>
+              {selectedFriends.includes(friend.id) && (
+                <Text style={styles.checkMark}>✓</Text>
+              )}
+            </TouchableOpacity>
+          ))}
             </ScrollView>
             <View style={styles.modalButtons}>
               <TouchableOpacity 
@@ -777,207 +892,427 @@ export default function MapScreen() {
             </View>
           </View>
         </View>
+      </Modal>  
+
+      {renderRaiteConfirmModal()}
+
+      <Modal visible={raiteAlertModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Solicitud de Raite</Text>
+
+            {selectedFriendRaite && (
+  <>
+            <Text style={{ color: '#fff', textAlign: 'center', marginBottom: 10 }}>
+              Tu amigo necesita un raite a:
+            </Text>
+            <Text style={{ color: '#fff', textAlign: 'center', marginBottom: 10 }}>
+              {selectedFriendRaite.friendName}
+            </Text>
+            <Text style={{ color: '#fff', textAlign: 'center' }}>
+              Latitud: {selectedFriendRaite.to.latitude.toFixed(5)}
+            </Text>
+            <Text style={{ color: '#fff', textAlign: 'center' }}>
+              Longitud: {selectedFriendRaite.to.longitude.toFixed(5)}
+            </Text>
+          </>
+        )}
+
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setRaiteAlertModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cerrar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
-  
+
+
     </SafeAreaView>
   );
-  
 }
-
+// Estilos mejorados para MapScreen.tsx
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: '#fff', marginTop: 10, fontSize: 16, fontWeight: 'bold' },
-  header: { backgroundColor: '#1e1e1e', paddingVertical: 10, paddingBottom: 16 },
-  chipsContainer: {},
-  chipsContent: { paddingHorizontal: 16 },
+  // Contenedores principales
+  container: { 
+    flex: 1, 
+    backgroundColor: '#121212' 
+  },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    backgroundColor: '#121212' 
+  },
+  loadingText: { 
+    color: '#fff', 
+    marginTop: 12, 
+    fontSize: 16, 
+    fontWeight: '500',
+    letterSpacing: 0.5
+  },
+  
+  // Header y filtros
+  header: { 
+    backgroundColor: '#1e1e1e', 
+    paddingVertical: 12, 
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  chipsContainer: {
+    paddingVertical: 4,
+  },
+  chipsContent: { 
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
   chip: {
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 25,
-    backgroundColor: '#222',
+    backgroundColor: '#2a2a2a',
     marginRight: 10,
     borderWidth: 1,
     borderColor: '#444',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
   },
-  chipSelected: { backgroundColor: '#bb86fc', borderColor: '#bb86fc' },
-  chipText: { color: '#fff', fontSize: 14 },
-  chipTextSelected: { color: '#121212', fontWeight: 'bold' },
+  chipSelected: { 
+    backgroundColor: '#bb86fc', 
+    borderColor: '#bb86fc',
+    elevation: 3,
+  },
+  chipText: { 
+    color: '#ddd', 
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  chipTextSelected: { 
+    color: '#121212', 
+    fontWeight: 'bold' 
+  },
   confirmButton: {
     backgroundColor: '#FF4081',
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     borderRadius: 25,
-    marginTop: 10,
+    marginTop: 12,
     alignSelf: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
   },
-  confirmButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-  mapContainer: { flex: 1 },
-  map: { flex: 1 },
+  confirmButtonText: { 
+    color: '#fff', 
+    fontWeight: 'bold', 
+    fontSize: 14,
+    letterSpacing: 0.5,
+  },
+  
+  // Mapa
+  mapContainer: { 
+    flex: 1,
+    overflow: 'hidden',
+  },
+  map: { 
+    flex: 1,
+  },
+  
+  // Botones flotantes
   addButton: {
     position: 'absolute',
     bottom: 30,
     right: 20,
     backgroundColor: '#bb86fc',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     borderRadius: 30,
     alignItems: 'center',
-    elevation: 5,
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    minWidth: 150,
   },
-  addButtonText: { color: '#121212', fontWeight: 'bold' },
+  addButtonText: { 
+    color: '#121212', 
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
   raiteButton: {
     position: 'absolute',
     bottom: 30,
     left: 20,
     backgroundColor: '#FF4081',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     borderRadius: 30,
     alignItems: 'center',
-    elevation: 5,
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    minWidth: 150,
   },
-  raiteButtonText: { color: '#fff', fontWeight: 'bold' },
+  raiteButtonText: { 
+    color: '#fff', 
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  
+  // Overlays
   loadingOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
+  },
+  
+  // Modales
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   modalContainer: {
     backgroundColor: '#1e1e1e',
-    width: '85%',
-    padding: 20,
-    borderRadius: 12,
+    width: '90%',
+    padding: 24,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#333',
-    elevation: 5,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    maxHeight: '80%',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#fff',
+    marginBottom: 20,
+    color: '#bb86fc',
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
-  modalMessage: { color: '#fff', marginBottom: 20, textAlign: 'center' },
+  modalMessage: { 
+    color: '#ddd', 
+    marginBottom: 20, 
+    textAlign: 'center',
+    lineHeight: 22,
+    fontSize: 16,
+  },
   modalInput: {
     borderWidth: 1,
     borderColor: '#444',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 16,
     color: '#fff',
-    backgroundColor: '#333',
+    backgroundColor: '#2a2a2a',
+    fontSize: 16,
   },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-around' },
+  modalButtons: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-around',
+    marginTop: 10,
+  },
   modalButton: {
     backgroundColor: '#bb86fc',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    minWidth: 100,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    minWidth: 120,
     alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
-  modalButtonCancel: { backgroundColor: '#333' },
-  modalButtonText: { color: '#121212', fontWeight: 'bold' },
-  friendsList: { maxHeight: 200, marginBottom: 16 },
+  modalButtonCancel: { 
+    backgroundColor: '#333',
+  },
+  modalButtonText: { 
+    color: '#121212', 
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  
+  // Lista de amigos
+  friendsList: { 
+    maxHeight: 250, 
+    marginBottom: 20,
+    borderRadius: 12,
+    backgroundColor: '#2a2a2a',
+    padding: 8,
+  },
   friendItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderColor: '#444',
-    paddingHorizontal: 10,
-  },
-  friendText: { color: '#fff', fontSize: 16 },
-  checkMark: { color: '#4CAF50', fontSize: 16, fontWeight: 'bold' },
-  starRatingContainer: {
-    marginTop: 12,
-  },
-  
-  imagePickerButton: {
-    backgroundColor: '#4f0c2e',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
     borderRadius: 8,
-    alignSelf: 'center',
-    marginTop: 10,
+    marginVertical: 2,
   },
-  
-  imagePickerButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  friendText: { 
+    color: '#fff', 
     fontSize: 16,
+    fontWeight: '500',
   },
+  checkMark: { 
+    color: '#4CAF50', 
+    fontSize: 18, 
+    fontWeight: 'bold' 
+  },
+  
+  // Selección de imágenes
   galleryButton: {
-    backgroundColor: '#4f0c2e', // Tu color principal
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    backgroundColor: '#4f0c2e',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 10,
-  }, 
+    marginVertical: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  
+  // Información del lugar
   ownerInfoContainer: {
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: 16,
+    borderRadius: 16,
+    width: '100%',
   },
   ownerAvatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: '#4f0c2e',
-    backgroundColor: '#ddd',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 10,
+    borderWidth: 3,
+    borderColor: '#bb86fc',
+    backgroundColor: '#333',
   },
   ownerName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#fff',
     textAlign: 'center',
+    marginTop: 4,
   },
   placeImage: {
     width: '100%',
     height: 200,
-    borderRadius: 12,
-    marginBottom: 15,
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#444',
   },
-
   modalDescription: {
-    fontSize: 15,
-    color: '#555',
-    marginBottom: 15,
-    textAlign: 'center',
+    fontSize: 16,
+    color: '#ddd',
+    marginBottom: 20,
+    textAlign: 'left',
     paddingHorizontal: 10,
+    lineHeight: 22,
   },
   modalRating: {
-    fontSize: 16,
-    color: '#fff',
-    marginBottom: 20,
+    fontSize: 18,
+    color: '#FFD700',
+    marginBottom: 24,
+    fontWeight: '600',
   },
   modalContent: {
     alignItems: 'center',
     paddingBottom: 20,
   },
   modalTitleM: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#4f0c2e',
-    marginBottom: 10,
+    color: '#bb86fc',
+    marginBottom: 16,
     textAlign: 'center',
   },
   
+  // Badge de notificación
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#FF4081',
+    borderWidth: 2,
+    borderColor: '#121212',
+    zIndex: 2,
+  },
   
+  // Estrellas de calificación
+  starRatingContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  starButton: {
+    padding: 5,
+  },
+  starIcon: {
+    fontSize: 32,
+  },
+  
+  // Imágenes seleccionadas
+  selectedImagesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginVertical: 10,
+  },
+  selectedImagePreview: {
+    width: 80,
+    height: 80,
+    margin: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bb86fc',
+  },
 });
