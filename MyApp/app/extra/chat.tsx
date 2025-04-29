@@ -8,8 +8,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'; // <-- impor
 import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { firestore } from '../../firebase';              
+import { firestore, database } from '../../firebase';              
 import { useChatMessages, sendMessage, generateChatId, RealtimeChatMessage } from '../services/chatService';
+import { ref, update, get } from 'firebase/database'; // Asegúrate de importar update y get
 
 const defaultUserImage = require('../../assets/images/img7.jpg');
 
@@ -83,6 +84,43 @@ export default function ChatScreen() {
       return true;
     });
   }, [sortedMessages]);
+
+  // Añade esta función para marcar mensajes como leídos
+  useEffect(() => {
+    const markMessagesAsRead = async () => {
+      if (!chatId || !currentUser || !friendId) return;
+      
+      try {
+        // 1. Obtener todos los mensajes de la conversación actual
+        const chatRef = ref(database, `messages/${chatId}`);
+        const snapshot = await get(chatRef);
+        
+        if (!snapshot.exists()) return;
+        
+        const updates: Record<string, boolean> = {};
+        
+        // 2. Recorrer los mensajes y marcar como leídos solo los que recibió el usuario actual
+        snapshot.forEach(messageSnapshot => {
+          const message = messageSnapshot.val();
+          // Solo marcar como leídos los mensajes enviados por el otro usuario (que el usuario actual recibió)
+          if (message.from === friendId && !message.read) {
+            updates[`messages/${chatId}/${messageSnapshot.key}/read`] = true;
+          }
+        });
+        
+        // 3. Si hay mensajes para actualizar, hacerlo de una sola vez
+        if (Object.keys(updates).length > 0) {
+          await update(ref(database), updates);
+          console.log(`${Object.keys(updates).length} mensajes marcados como leídos`);
+        }
+      } catch (error) {
+        console.error("Error al marcar mensajes como leídos:", error);
+      }
+    };
+
+    // Ejecutar al montar el componente y si cambia el chatId
+    markMessagesAsRead();
+  }, [chatId, currentUser, friendId]);
 
   return (
     <KeyboardAvoidingView
