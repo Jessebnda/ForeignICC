@@ -6,6 +6,8 @@ import {
   Image,
   Dimensions,
   TouchableOpacity,
+  ActivityIndicator,
+  Modal,
   Text
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -21,6 +23,7 @@ import { addDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { ScrollView } from 'react-native';
 import { RefreshControl } from 'react-native';
+import EditItem from '../(adminTabs)/editItem';
 
 
 type Post = {
@@ -31,7 +34,8 @@ type Post = {
     name: string;
     image: any;
   };
-  likes: Record<string, boolean>;
+  likeCount?: number;
+  likes?: { [userId: string]: true };
   comments: any[];
 };
 
@@ -117,8 +121,13 @@ export default function FeedScreen() {
   const [currentUserId, setCurrentUserId] = useState('');
   const [currentUserData, setCurrentUserData] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(false);
 
 
+  const closeModal = () => {
+    setSelectedPost(null);
+    fetchPosts();
+};
 
   useEffect(() => {
     const fetchCurrentUserData = async () => {
@@ -162,6 +171,7 @@ export default function FeedScreen() {
     
         const loadedPosts = await Promise.all(snapshot.docs.map(async (docPost) => {
           const data = docPost.data();
+          const likesMap = data.likes || {};
           const userId = data.userId;
     
           let userData = {
@@ -200,7 +210,8 @@ export default function FeedScreen() {
               university: userData.university,
             },
             content: data.caption,
-            likes: data.likes ? Object.keys(data.likes).length : 0,
+            likes: likesMap,
+            likeCount: Object.keys(likesMap).length,
             comments: data.comments || [],
           };
         }));
@@ -269,7 +280,7 @@ export default function FeedScreen() {
             updatedLikes[currentUserId] = true;
           }
         
-          return { ...prev, likes: updatedLikes };
+          return { ...prev, likes: updatedLikes, likeCount: Object.keys(updatedLikes).length, };
         });
         setLiked(!liked);
         
@@ -277,6 +288,12 @@ export default function FeedScreen() {
         console.error('❌ Error actualizando like:', error);
       }
     };
+
+    useEffect(() => {
+      if (selectedPost && currentUserId) {
+        setLiked(!!selectedPost.likes?.[currentUserId]);
+      }
+    }, [selectedPost, currentUserId]);
 
   const goToCreatePost = () => {
     router.push({ pathname: '/extra/crearpubli' });
@@ -327,7 +344,13 @@ export default function FeedScreen() {
       console.error('❌ Error al cargar comentarios:', error);
     }
   };
-  
+
+  useEffect(() => {
+    if (selectedPost?.id) {
+      setLoadingComments(true);
+      loadComments(selectedPost.id).finally(() => setLoadingComments(false));
+    }
+  }, [selectedPost]);  
 
   const renderPost = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.postCard} onPress={() => goToPostDetail(item)}>
@@ -369,90 +392,110 @@ export default function FeedScreen() {
         numColumns={2}
         columnWrapperStyle={styles.postRow}
         renderItem={renderPost}
-        ListHeaderComponent={<WeeklyEventsSlider friendPosts={friendPosts} onPressItem={goToPostDetail} />}
+        ListHeaderComponent={
+          <WeeklyEventsSlider friendPosts={friendPosts} onPressItem={goToPostDetail} />
+        }
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       />
-      
-        {selectedPost && (
-  <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.detailOverlay}>
-     <KeyboardAvoidingView
-    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    style={{ flex: 1 }}
-  >
-    <ScrollView
-  contentContainerStyle={styles.detailScroll}
-  refreshControl={
-    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-    <View style={styles.imageWrapper}>
-      <Image
-        source={typeof selectedPost.image === 'string' ? { uri: selectedPost.image } : selectedPost.image}
-        style={[styles.detailImage, liked && styles.likedImage]}
-        resizeMode="cover"
-      />
+  
+      {/* Post Detail Modal */}
+      {selectedPost && (
+        
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={!!selectedPost}
+          onRequestClose={closeModal}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.detailOverlay}
+          >
+            <ScrollView style={styles.detailScroll}>
+              <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+                <Ionicons name="close-circle" size={32} color="#aaa" />
+              </TouchableOpacity>
+  
+              {/* Author Info */}
+              <View style={styles.detailAuthor}>
+                <Image
+                   source={selectedPost.user.image || require('../../../assets/images/img7.jpg')}
+                  style={styles.detailAuthorImage}
+                />
+                <Text style={styles.detailAuthorName}>{selectedPost.user.name}</Text>
+              </View>
+  
+              {/* Image */}
+              {selectedPost.image && (
+                <Image
+                  source={{ uri: selectedPost.image }}
+                  style={styles.detailImage}
+                />
+              )}
+  
+              {/* Content/Caption */}
+              <View style={styles.detailContent}>
+                <Text style={styles.detailCaption}>{selectedPost.content}</Text>
+  
+                {/* Like Button */}
+                <View style={{ width: '100%', marginTop: 16, alignItems: 'flex-start' }}>
+                <TouchableOpacity onPress={toggleLike} style={styles.likeButton}>
+                    <Ionicons
+                      name={liked ? "heart" : "heart-outline"}
+                      size={28}
+                      color={liked ? "#e91e63" : "#fff"}
+                    />
+                  </TouchableOpacity>
+                </View>
 
-      <TouchableOpacity onPress={toggleLike} style={styles.likeOverlayButton}>
-        <Ionicons
-          name={liked ? 'heart' : 'heart-outline'}
-          size={28}
-          color={liked ? '#f77' : '#fff'}
-        />
-      </TouchableOpacity>
-      <Text style={styles.actionText}>{likeCount}</Text>
-    </View>
-
-    <View style={styles.detailContent}>
-      <Text style={styles.detailUser}>{selectedPost.user.name}</Text>
-      <Text style={styles.detailCaption}>{selectedPost.content}</Text>
-
-      {/* Comentarios */}
-      <View style={{ width: '100%', marginTop: 16 }}>
-        {comments.map((c, i) => (
-          <View key={i} style={styles.commentBubble}>
-            <Text style={styles.commentText}>🗨 {c.text}</Text>
-          </View>
-        ))}
-        <View style={styles.commentInputRow}>
-          <TextInput
-            placeholder="Escribe un comentario..."
-            placeholderTextColor="#888"
-            value={newComment}
-            onChangeText={setNewComment}
-            style={styles.commentInput}
-          />
-          <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
-          <Ionicons name="send" size={20} color={newComment.trim() ? '#bb86fc' : '#888'} />
+                <Text style={styles.actionText}>{selectedPost.likeCount} Me gusta</Text>
+  
+            <View style={{ width: '100%', marginTop: 16 }}>
+              {loadingComments ? (
+                <ActivityIndicator color="#bb86fc" />
+              ) : comments.length > 0 ? (
+                comments.map((comment) => (
+                  <View key={comment.id} style={styles.commentBubble}>
+                    <Text style={styles.commentText}>🗨 {comment.text}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noDataText}>No hay comentarios aún.</Text>
+              )}
+            </View>
+              </View>
+            </ScrollView>
+  
+            {/* Comment Input */}
+            <View style={styles.commentInputRow}>
+              <TextInput
+                style={styles.commentInput}
+                placeholder="Añadir un comentario..."
+                placeholderTextColor="#888"
+                value={newComment}
+                onChangeText={setNewComment}
+              />
+              <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
+                <Ionicons name="send" size={24} color={newComment.trim() ? "#bb86fc" : "#888"} />
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      )}
+  
+      {/* crear post bton */}
+      {!isKeyboardVisible && (
+        <TouchableOpacity style={styles.fab} onPress={goToCreatePost}>
+          <Text style={styles.fabText}>＋</Text>
         </TouchableOpacity>
-
-
-        </View>
-      </View>
-
-      <TouchableOpacity onPress={() => setSelectedPost(null)} style={styles.closeButton}>
-      <Ionicons name="arrow-back" size={24} color="#bb86fc" />
-      <Text style={styles.closeDetail}>Cerrar</Text>
-  </TouchableOpacity>
-    </View>
-    </ScrollView>
-    </KeyboardAvoidingView>
-  </Animated.View>
-)}
-
-{!isKeyboardVisible && (     
-      <TouchableOpacity style={styles.fab} onPress={goToCreatePost}>
-        <Text style={styles.fabText}>＋</Text>
-      </TouchableOpacity>
       )}
     </View>
-    
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#121212' },
   contentContainer: { padding: 16 },
@@ -585,30 +628,34 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start', // 👈 Esto alinea a la izquierda
     textAlign: 'left',
   },
-  
   likeButton: {
-    marginVertical: 12,
-    backgroundColor: '#333',
-    padding: 8,
-    borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  
+    padding: 8,
+},
   commentInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    backgroundColor: '#121212',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
-  
   commentInput: {
     flex: 1,
-    backgroundColor: '#333',
-    padding: 8,
-    borderRadius: 8,
+    backgroundColor: '#2a2a2a',
     color: '#fff',
-    marginRight: 8,
+    paddingHorizontal: 15,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+    borderRadius: 20,
+    marginRight: 10,
+    fontSize: 15,
   },
-  
   sendButton: {
     color: '#bb86fc',
     fontWeight: 'bold',
@@ -629,6 +676,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
   },  
+  likeCount: {
+    color: '#fff',
+    fontSize: 14,
+  },
   imageWrapper: {
     position: 'relative',
     width: '100%',
@@ -643,11 +694,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   }, 
   closeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 24,
-    alignSelf: 'flex-start',
-  },
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20,
+    right: 15,
+    zIndex: 10,
+},
   closeDetail: {
     color: '#bb86fc',
     fontSize: 16,
@@ -663,5 +714,48 @@ const styles = StyleSheet.create({
   detailScroll: {
     paddingBottom: 80,
   } ,
-  
+  detailAuthor: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 5,
+},
+detailAuthorImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+    backgroundColor: '#555',
+},
+detailAuthorName: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+},
+detailActions: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 20,
+},
+sectionTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: '#fff',
+  marginBottom: 12,
+  paddingHorizontal: 16,
+},
+commentUser: {
+  color: '#aaa',
+  fontWeight: 'bold',
+  fontSize: 13,
+  marginBottom: 4,
+},
+noDataText: {
+  color: '#888',
+  fontStyle: 'italic',
+  textAlign: 'center',
+  marginTop: 10,
+  width: '100%',
+  paddingHorizontal: 16,
+},
 });

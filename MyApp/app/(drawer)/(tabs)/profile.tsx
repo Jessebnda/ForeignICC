@@ -26,7 +26,10 @@ import {
     query,
     orderBy,
     getDoc,
-    // Add necessary functions for modal actions if implementing them fully
+    updateDoc,
+    deleteField,
+    serverTimestamp,
+    addDoc
     // updateDoc, addDoc, serverTimestamp, deleteField
 } from 'firebase/firestore';
 import { firestore } from '../../../firebase';
@@ -34,6 +37,7 @@ import { useRouter } from 'expo-router';
 
 // Default image asset
 const defaultUserImage = require('../../../assets/images/img7.jpg');
+
 
 export default function ProfileScreen() {
     const { user, userProfile, loading: loadingProfile, refreshProfile } = useUser();
@@ -44,10 +48,12 @@ export default function ProfileScreen() {
 
     // Modal State
     const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-    const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<any[]>([]);
     const [newComment, setNewComment] = useState('');
     const [liked, setLiked] = useState(false);
     const [loadingComments, setLoadingComments] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState('');
+    
 
     // --- Fetch User Posts Function (Revised) ---
     const fetchUserPosts = useCallback(async () => {
@@ -72,6 +78,7 @@ export default function ProfileScreen() {
             // or use Promise.all if performance is acceptable.
             for (const docPost of snapshot.docs) {
                 const data = docPost.data();
+                const likesMap = data.likes || {};
                 const postUserId = data.userId;
 
                 // Filter for current user's posts
@@ -101,7 +108,8 @@ export default function ProfileScreen() {
                         content: data.caption || '', // Use 'caption' field from Firestore
                         userName: authorName,
                         userPhoto: authorPhoto,
-                        likes: data.likes || {},
+                        likes: likesMap,
+                        likeCount: Object.keys(likesMap).length,                        
                         comments: data.comments || [], // Assuming comments are stored directly
                         createdAt: data.createdAt,
                     });
@@ -165,52 +173,94 @@ export default function ProfileScreen() {
     };
 
     const loadComments = async (postId: string) => {
-        console.log("Loading comments for:", postId);
-        setLoadingComments(true);
-        // --- Implement Firestore logic to fetch comments ---
-        // Example:
-        // try {
-        //   const commentsQuery = query(collection(firestore, 'feedPosts', postId, 'comments'), orderBy('createdAt', 'asc'));
-        //   const snapshot = await getDocs(commentsQuery);
-        //   const fetchedComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Comment));
-        //   setComments(fetchedComments);
-        // } catch (error) { console.error("Error loading comments:", error); setComments([]); }
-        // finally { setLoadingComments(false); }
-        setComments([]); // Placeholder
-        setLoadingComments(false); // Placeholder
-    };
+        try {
+          const q = query(
+            collection(firestore, 'feedPosts', postId, 'comments'),
+            orderBy('created_at', 'desc')
+          );
+          const snapshot = await getDocs(q);
+          const loadedComments = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          setComments(loadedComments);
+        } catch (error) {
+          console.error('❌ Error al cargar comentarios:', error);
+        }
+      };
+      
+       useEffect(() => {
+          if (selectedPost?.id) {
+            setLoadingComments(true);
+            loadComments(selectedPost.id).finally(() => setLoadingComments(false));
+          }
+        }, [selectedPost]);  
 
     const handleAddComment = async () => {
-        if (!newComment.trim() || !selectedPost || !user) return;
-        console.log("Adding comment:", newComment);
-        // --- Implement Firestore logic to add comment ---
-        // Example:
-        // try {
-        //   const commentData = { userId: user.uid, text: newComment, createdAt: serverTimestamp(), userName: userProfile?.name || 'Usuario' };
-        //   await addDoc(collection(firestore, 'feedPosts', selectedPost.id, 'comments'), commentData);
-        //   setNewComment('');
-        //   await loadComments(selectedPost.id); // Refresh comments
-        // } catch (error) { console.error("Error adding comment:", error); }
-        setNewComment(''); // Placeholder
-    };
+        if (!newComment.trim() || !selectedPost) return;
+    
+        const comment = {
+          text: newComment.trim(),
+          created_at: serverTimestamp(),
+          user: {
+            name: 'Tú',
+            image: require('../../../assets/images/img7.jpg'), // Reemplaza si tienes auth
+          },
+          likes: 0,
+        };
+    
+        try {
+          await addDoc(collection(firestore, 'feedPosts', selectedPost.id, 'comments'), comment);
+          setComments((prev) => [comment, ...prev]);
+          setNewComment('');
+        } catch (error) {
+          console.error('❌ Error guardando comentario:', error);
+        }
+      };
 
-    const toggleLike = async () => {
-        if (!selectedPost || !user) return;
-        console.log("Toggling like for:", selectedPost.id);
-        // --- Implement Firestore logic to update likes ---
-        // Example:
-        // const postRef = doc(firestore, 'feedPosts', selectedPost.id);
-        // const userId = user.uid;
-        // try {
-        //   await updateDoc(postRef, {
-        //     [`likes.${userId}`]: liked ? deleteField() : true // Use deleteField to remove like
-        //   });
-        //   // Update local state optimistically or after success
-        //   setLiked(!liked);
-        //   // Optionally update the likes count in selectedPost state
-        // } catch (error) { console.error("Error toggling like:", error); }
-        setLiked(!liked); // Placeholder
-    };
+    //likes
+        const toggleLike = async () => {
+          if (!selectedPost || !currentUserId) return;
+        
+          const postRef = doc(firestore, 'feedPosts', selectedPost.id);
+        
+          try {
+            if (liked) {
+              await updateDoc(postRef, {
+                [`likes.${currentUserId}`]: deleteField(),
+              });
+            } else {
+              await updateDoc(postRef, {
+                [`likes.${currentUserId}`]: true,
+              });
+            }
+        
+            // Actualiza UI local
+            setSelectedPost((prev) => {
+              if (!prev) return prev;
+            
+              const updatedLikes = { ...prev.likes };
+            
+              if (liked) {
+                delete updatedLikes[currentUserId];
+              } else {
+                updatedLikes[currentUserId] = true;
+              }
+            
+              return { ...prev, likes: updatedLikes, likeCount: Object.keys(updatedLikes).length, };
+            });
+            setLiked(!liked);
+            
+          } catch (error) {
+            console.error('❌ Error actualizando like:', error);
+          }
+        };
+    
+    useEffect(() => {
+          if (selectedPost && currentUserId) {
+            setLiked(!!selectedPost.likes?.[currentUserId]);
+          }
+        }, [selectedPost, currentUserId]);
 
     const closeModal = () => {
         setSelectedPost(null);
@@ -304,89 +354,79 @@ export default function ProfileScreen() {
             </View>
 
             {/* Post Detail Modal */}
-            {selectedPost && (
-                <Modal
-                    animationType="slide"
-                    transparent={true}
-                    visible={!!selectedPost}
-                    onRequestClose={closeModal}
-                >
-                    <KeyboardAvoidingView
+                  {selectedPost && (
+                    <Modal
+                      animationType="slide"
+                      transparent={true}
+                      visible={!!selectedPost}
+                      onRequestClose={closeModal}
+                    >
+                      <KeyboardAvoidingView
                         behavior={Platform.OS === "ios" ? "padding" : "height"}
                         style={styles.detailOverlay}
-                    >
+                      >
                         <ScrollView style={styles.detailScroll}>
-                            <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
-                                <Ionicons name="close-circle" size={32} color="#aaa" />
-                            </TouchableOpacity>
-
-                            {/* Author Info (Revised Image Source) */}
-                            <View style={styles.detailAuthor}>
-                                <Image
-                                    // Check if userPhoto is already an object {uri: ...} or a number (require)
-                                    source={selectedPost.userPhoto || defaultUserImage}
-                                    style={styles.detailAuthorImage}
-                                />
-                                <Text style={styles.detailAuthorName}>{selectedPost.userName}</Text>
-                            </View>
-
-                            {/* Image */}
-                            {selectedPost.imageUrl && (
-                                <Image source={{ uri: selectedPost.imageUrl }} style={styles.detailImage} />
-                            )}
-
-                            {/* Content/Caption */}
-                            <View style={styles.detailContent}>
-                                <Text style={styles.detailCaption}>{selectedPost.content}</Text>
-
-                                {/* Like Button */}
-                                <View style={styles.detailActions}>
-                                    <TouchableOpacity onPress={toggleLike} style={styles.likeButton}>
-                                        <Ionicons
-                                            name={liked ? "heart" : "heart-outline"}
-                                            size={28}
-                                            color={liked ? "#e91e63" : "#fff"}
-                                        />
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Comments Section */}
-                                <Text style={styles.sectionTitle}>Comentarios</Text>
-                                {loadingComments ? (
-                                    <ActivityIndicator color="#bb86fc" />
-                                ) : (
-                                    <>
-                                        {comments.length > 0 ? (
-                                            comments.map((comment) => (
-                                                <View key={comment.id} style={styles.commentBubble}>
-                                                    <Text style={styles.commentUser}>{comment.userName || 'Usuario'}</Text>
-                                                    <Text style={styles.commentText}>{comment.text}</Text>
-                                                </View>
-                                            ))
-                                        ) : (
-                                            <Text style={styles.noDataText}>No hay comentarios aún.</Text>
-                                        )}
-                                    </>
-                                )}
-                            </View>
+                          <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+                            <Ionicons name="close-circle" size={32} color="#aaa" />
+                          </TouchableOpacity>
+              
+                          {/* Author Info */}
+                          <View style={styles.detailAuthor}>
+                            <Image
+                               source={selectedPost.userPhoto || require('../../../assets/images/img7.jpg')}
+                              style={styles.detailAuthorImage}
+                            />
+                            <Text style={styles.detailAuthorName}>{selectedPost.userName}</Text>
+                          </View>
+              
+                          {/* Image */}
+                          {selectedPost.imageUrl && (
+                            <Image
+                              source={{ uri: selectedPost.imageUrl }}
+                              style={styles.detailImage}
+                            />
+                          )}
+              
+                          {/* Content/Caption */}
+                          <View style={styles.detailContent}>
+                            <Text style={styles.detailCaption}>{selectedPost.content}</Text>
+              
+                     <Text style={styles.detailContent}>{selectedPost.likeCount} Me gusta</Text>
+                            
+              
+                        <View style={{ width: '100%', marginTop: 16 }}>
+                          {loadingComments ? (
+                            <ActivityIndicator color="#bb86fc" />
+                          ) : comments.length > 0 ? (
+                            comments.map((comment) => (
+                              <View key={comment.id} style={styles.commentBubble}>
+                                <Text style={styles.commentText}>🗨 {comment.text}</Text>
+                              </View>
+                            ))
+                          ) : (
+                            <Text style={styles.noDataText}>No hay comentarios aún.</Text>
+                          )}
+                        </View>
+                          </View>
                         </ScrollView>
-
+              
                         {/* Comment Input */}
                         <View style={styles.commentInputRow}>
-                            <TextInput
-                                style={styles.commentInput}
-                                placeholder="Añadir un comentario..."
-                                placeholderTextColor="#888"
-                                value={newComment}
-                                onChangeText={setNewComment}
-                            />
-                            <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
-                                <Ionicons name="send" size={24} color={newComment.trim() ? "#bb86fc" : "#888"} />
-                            </TouchableOpacity>
+                          <TextInput
+                            style={styles.commentInput}
+                            placeholder="Añadir un comentario..."
+                            placeholderTextColor="#888"
+                            value={newComment}
+                            onChangeText={setNewComment}
+                          />
+                          <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
+                            <Ionicons name="send" size={24} color={newComment.trim() ? "#bb86fc" : "#888"} />
+                          </TouchableOpacity>
                         </View>
-                    </KeyboardAvoidingView>
-                </Modal>
-            )}
+                      </KeyboardAvoidingView>
+                    </Modal>
+                  )}    
+            
         </ScrollView> // <-- Close ScrollView here
     );
 }
@@ -544,7 +584,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#222',
     },
     detailContent: {
-        paddingBottom: 80, // Space for comment input
+        alignItems: 'center',
     },
     detailCaption: {
         color: '#eee',

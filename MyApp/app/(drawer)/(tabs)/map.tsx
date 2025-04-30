@@ -1,5 +1,5 @@
 // MapScreen.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef} from 'react';
 import { 
   View,
   Text,
@@ -24,8 +24,9 @@ import { Image } from 'react-native';
 import { database } from '../../../firebase'; 
 import { set, ref as DatabaseRef, remove, onValue } from 'firebase/database';
 import MapView, { Marker, LatLng, Polyline } from 'react-native-maps';
-
-
+import { useRouter } from 'expo-router';
+import { useRaite } from '../../../context/RaiteContext';
+import { Ionicons } from '@expo/vector-icons';
 
 
 const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
@@ -55,7 +56,12 @@ export default function MapScreen() {
   const [friendRaiteRequests, setFriendRaiteRequests] = useState<FriendRaiteRequest[]>([]);
   const [raiteAlertModalVisible, setRaiteAlertModalVisible] = useState(false);
   const [selectedFriendRaite, setSelectedFriendRaite] = useState<{ friendId: string; friendName: string; to: LatLng } | null>(null);
+  const { setHasActiveRaiteRequest } = useRaite();
+  const mapRef = useRef<MapView>(null);
 
+ 
+  const router = useRouter();
+  
   type FriendRaiteRequest = {
     friendId: string;
     friendName: string;
@@ -328,6 +334,10 @@ export default function MapScreen() {
     };
   }, [friendIds, friends]);
   
+  useEffect(() => {
+    setHasActiveRaiteRequest(friendRaiteRequests.length > 0);
+  }, [friendRaiteRequests]);
+  
   // Solicitar permisos y obtener la ubicación real con Expo Location
   useEffect(() => {
     (async () => {
@@ -458,6 +468,33 @@ export default function MapScreen() {
     }
   };
 
+  const handleAcceptRaite = async () => {
+    if (!selectedFriendRaite || !currentUserId) return;
+  
+    try {
+      // Actualizar el estado a 'accepted' en la solicitud del amigo
+      const friendRequestRef = DatabaseRef(database, `raiteRequests/${selectedFriendRaite.friendId}`);
+      await set(friendRequestRef, {
+        ...selectedFriendRaite,
+        status: 'accepted',
+        acceptedBy: currentUserId,
+      });
+  
+      // Cerrar modal
+      setRaiteAlertModalVisible(false);
+      setSelectedFriendRaite(null);
+  
+      // Navegar al chat
+      router.push(`/extra/chat?uid=${selectedFriendRaite.friendId}`);
+    } catch (error) {
+      console.error('❌ Error al aceptar raite:', error);
+      Alert.alert('Error', 'No se pudo aceptar la solicitud.');
+    }
+  };
+
+  
+  
+
   const pickImagesFromLibrary = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -491,15 +528,6 @@ export default function MapScreen() {
     <View style={styles.modalContainer}>
       <Text style={styles.modalTitle}>¿Confirmar Destino de Raite?</Text>
 
-      <View style={{ marginVertical: 20 }}>
-        <Text style={{ color: '#fff', textAlign: 'center' }}>
-          Latitud: {selectedRaitePlace?.latitude.toFixed(5)}
-        </Text>
-        <Text style={{ color: '#fff', textAlign: 'center' }}>
-          Longitud: {selectedRaitePlace?.longitude.toFixed(5)}
-        </Text>
-      </View>
-
       <View style={styles.modalButtons}>
         <TouchableOpacity
           style={[styles.modalButton, styles.modalButtonCancel]}
@@ -514,6 +542,7 @@ export default function MapScreen() {
         >
           <Text style={styles.modalButtonText}>Confirmar</Text>
         </TouchableOpacity>
+
       </View>
     </View>
   </View>
@@ -577,6 +606,7 @@ export default function MapScreen() {
       {/* Mapa */}
       <View style={styles.mapContainer}>
         <MapView
+           ref={mapRef}
           style={styles.map}
           initialRegion={{
             latitude: userLocation.latitude,
@@ -643,14 +673,64 @@ export default function MapScreen() {
             <Marker coordinate={selectedRaitePlace} pinColor="orange" title="Lugar para Raite" />
           )}
 
-        {selectedFriendRaite && userLocation && (
-          <Polyline
-            coordinates={[userLocation, selectedFriendRaite.to]}
-            strokeColor="#4f0c2e"
-            strokeWidth={4}
-          />
-        )}
+          {selectedFriendRaite && userLocation && (
+            <>
+              {/* Línea principal */}
+              <Polyline
+                coordinates={[userLocation, selectedFriendRaite.to]}
+                strokeColor="#4f0c2e"
+                strokeWidth={4}
+                lineCap="round"
+                lineJoin="round"
+              />
+              
+              {/* Punto de inicio */}
+              <Marker
+                coordinate={userLocation}
+                anchor={{ x: 0.5, y: 0.5 }}
+              >
+                <View style={{
+                  width: 15,
+                  height: 15,
+                  borderRadius: 7.5,
+                  backgroundColor: '#4CAF50',
+                  borderWidth: 2,
+                  borderColor: 'white',
+                }} />
+              </Marker>
+              
+              {/* Punto de destino */}
+              <Marker
+                coordinate={selectedFriendRaite.to}
+                anchor={{ x: 0.5, y: 0.5 }}
+              >
+                <View style={{
+                  width: 15,
+                  height: 15,
+                  borderRadius: 7.5,
+                  backgroundColor: '#F44336',
+                  borderWidth: 2,
+                  borderColor: 'white',
+                }} />
+              </Marker>
+            </>
+          )}
         </MapView>
+        
+        {/* alguien pide raite */}
+        {friendRaiteRequests.length > 0 && (
+        <TouchableOpacity
+          style={styles.pillBadge}
+          onPress={() => {
+            setSelectedFriendRaite(friendRaiteRequests[0]);
+            setRaiteAlertModalVisible(true);
+          }}
+        >
+          <Ionicons name="car-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={styles.pillBadgeText}>1 Solicitud de raite</Text>
+        </TouchableOpacity>
+      )}
+
   
         {/* Loading si está cargando */}
         {isLoading && (
@@ -676,6 +756,7 @@ export default function MapScreen() {
           {isAddingPlace ? 'Cancelar' : 'Agregar Lugar'}
         </Text>
       </TouchableOpacity>
+      
 
       {/* Botón Pedir Raite */}
       <TouchableOpacity 
@@ -685,17 +766,6 @@ export default function MapScreen() {
         ]} 
         onPress={toggleRaiteMode}
       >
-        {friendRaiteRequests.length > 0 && (
-          <TouchableOpacity
-          style={styles.badge}
-          onPress={() => {
-            if (friendRaiteRequests.length > 0) {
-              setSelectedFriendRaite(friendRaiteRequests[0]);
-              setRaiteAlertModalVisible(true);
-            }
-          }}
-        />
-        )}
         <Text style={[
           styles.raiteButtonText,
           isRaiteActive && { color: '#FF4081' }
@@ -897,40 +967,50 @@ export default function MapScreen() {
       {renderRaiteConfirmModal()}
 
       <Modal visible={raiteAlertModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Solicitud de Raite</Text>
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalContainer}>
+      <Text style={styles.modalTitle}>Solicitud de Raite</Text>
 
-            {selectedFriendRaite && (
-  <>
-            <Text style={{ color: '#fff', textAlign: 'center', marginBottom: 10 }}>
-              Tu amigo necesita un raite a:
-            </Text>
-            <Text style={{ color: '#fff', textAlign: 'center', marginBottom: 10 }}>
-              {selectedFriendRaite.friendName}
-            </Text>
-            <Text style={{ color: '#fff', textAlign: 'center' }}>
-              Latitud: {selectedFriendRaite.to.latitude.toFixed(5)}
-            </Text>
-            <Text style={{ color: '#fff', textAlign: 'center' }}>
-              Longitud: {selectedFriendRaite.to.longitude.toFixed(5)}
-            </Text>
-          </>
-        )}
+      {selectedFriendRaite && (
+        <>
+          <Text style={{ color: '#fff', textAlign: 'center', marginBottom: 10 }}>
+            Tu amigo <Text style={{ fontWeight: 'bold' }}>{selectedFriendRaite.friendName}</Text> necesita un raite.
+          </Text>
+        </>
+      )}
 
+        <View style={styles.modalButtons}>
+          <TouchableOpacity
+            style={[styles.modalButton, styles.modalButtonCancel]}
+            onPress={() => {
+              setRaiteAlertModalVisible(false);
+              setSelectedFriendRaite(null);
+            }}
+          >
+            <Text style={styles.modalButtonText}>Rechazar</Text>
+          </TouchableOpacity>
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
-                onPress={() => setRaiteAlertModalVisible(false)}
-              >
-                <Text style={styles.modalButtonText}>Cerrar</Text>
-              </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.modalButton}
+            onPress={handleAcceptRaite}
+          >
+            <Text style={styles.modalButtonText}>Aceptar</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Botón separado para ver la ruta */}
+        <TouchableOpacity
+          onPress={() => {
+            setRaiteAlertModalVisible(false);
+          }}
+          style={styles.viewRouteButton}
+        >
+          <Text style={styles.viewRouteText}>📍 Ver ruta</Text>
+        </TouchableOpacity>
+
             </View>
           </View>
-        </View>
-      </Modal>
-
+        </Modal>
 
     </SafeAreaView>
   );
@@ -1271,20 +1351,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  
-  // Badge de notificación
+  //noti raite
   badge: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    top: -8,
+    right: -8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: '#FF4081',
     borderWidth: 2,
     borderColor: '#121212',
     zIndex: 2,
   },
+  
   
   // Estrellas de calificación
   starRatingContainer: {
@@ -1315,4 +1395,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#bb86fc',
   },
+  viewRouteButton: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#333',
+    borderRadius: 10,
+    alignSelf: 'center',
+  },
+  viewRouteText: {
+    color: '#bb86fc',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  pillBadge: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    flexDirection: 'row',
+    backgroundColor: '#FF4081',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    zIndex: 10,
+  },
+  pillBadgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  
 });

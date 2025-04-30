@@ -18,7 +18,7 @@ export interface Post {
   userPhoto: ImageSourcePropType | string; // Profile photo of the author (URI object or require) <-- Add this and ensure type compatibility
   imageUrl?: string | null; // URL of the post image (optional)
   content: string; // Caption or text content of the post
-  likes?: { [userId: string]: boolean }; // Map of user IDs who liked the post
+  likes?: { [userId: string]: true };  likeCount?: number;
   comments?: Comment[]; // Array of comments (optional)
   createdAt: any; // Timestamp (e.g., Firestore Timestamp or Date)
   // Add other relevant post fields if needed (e.g., location)
