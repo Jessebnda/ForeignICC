@@ -24,6 +24,7 @@ import { getAuth } from 'firebase/auth';
 import { ScrollView } from 'react-native';
 import { RefreshControl } from 'react-native';
 import EditItem from '../(adminTabs)/editItem';
+import { createNotification } from '../../../services/notificationService';
 
 
 type Post = {
@@ -31,8 +32,10 @@ type Post = {
   image: string;
   content: string;
   user: {
+    id: string;  // Añadir esta propiedad que estaba faltando
     name: string;
     image: any;
+    university?: string;  // También incluir esta que usas más adelante
   };
   likeCount?: number;
   likes?: { [userId: string]: true };
@@ -263,11 +266,29 @@ export default function FeedScreen() {
             [`likes.${currentUserId}`]: deleteField(),
           });
         } else {
+          // Añadir like
           await updateDoc(postRef, {
             [`likes.${currentUserId}`]: true,
           });
+          
+          // Crear notificación de like - AÑADIR ESTE BLOQUE
+          if (selectedPost.user.id !== currentUserId) {
+            try {
+              await createNotification({
+                type: 'post_like',
+                fromUserId: currentUserId,
+                fromUserName: currentUserData?.name || 'Usuario',
+                fromUserPhoto: currentUserData?.photo || '',
+                toUserId: selectedPost.user.id,
+                contentId: selectedPost.id,
+                contentText: selectedPost.content?.substring(0, 100) || ''
+              });
+            } catch (err) {
+              console.error('Error al crear notificación de like:', err);
+            }
+          }
         }
-    
+        
         // Actualiza UI local
         setSelectedPost((prev) => {
           if (!prev) return prev;
@@ -323,6 +344,24 @@ export default function FeedScreen() {
       await addDoc(collection(firestore, 'feedPosts', selectedPost.id, 'comments'), comment);
       setComments((prev) => [comment, ...prev]);
       setNewComment('');
+      
+      // Crear notificación de comentario - AÑADIR ESTE BLOQUE
+      if (selectedPost.user.id !== currentUserId) {
+        try {
+          // Importar al inicio del archivo si no está: import { createNotification } from '../../../services/notificationService';
+          await createNotification({
+            type: 'post_comment',
+            fromUserId: currentUserId,
+            fromUserName: currentUserData?.name || 'Usuario',
+            fromUserPhoto: currentUserData?.photo || '',
+            toUserId: selectedPost.user.id,
+            contentId: selectedPost.id,
+            contentText: newComment.trim().substring(0, 100)
+          });
+        } catch (err) {
+          console.error('Error al crear notificación de comentario:', err);
+        }
+      }
     } catch (error) {
       console.error('❌ Error guardando comentario:', error);
     }

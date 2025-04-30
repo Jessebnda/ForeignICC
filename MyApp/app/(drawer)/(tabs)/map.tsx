@@ -15,8 +15,8 @@ import {
 import * as Location from 'expo-location';
 import { firestore } from '../../../firebase';
 import { getAuth } from 'firebase/auth';
-import { doc, getDoc, collection, getDocs, setDoc } from 'firebase/firestore';
-import { GeoPoint } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, setDoc, query, where, serverTimestamp, GeoPoint } from 'firebase/firestore';
+import { createNotification } from '../../../services/notificationService';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../../firebase';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,7 +27,6 @@ import MapView, { Marker, LatLng, Polyline } from 'react-native-maps';
 import { useRouter } from 'expo-router';
 import { useRaite } from '../../../context/RaiteContext';
 import { Ionicons } from '@expo/vector-icons';
-
 
 const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
 
