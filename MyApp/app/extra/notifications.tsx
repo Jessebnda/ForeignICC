@@ -44,7 +44,7 @@ const defaultUserImage = require('../../assets/images/img7.jpg');
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const { notifications, messageNotifications, hasUnread, markAllAsRead, fetchNotifications } = useNotifications();
+  const { notifications, messageNotifications, hasUnread, markAllAsRead, fetchNotifications, markAsRead } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -80,8 +80,76 @@ export default function NotificationsScreen() {
     return <Ionicons name="notifications" size={20} color="#bb86fc" />;
   };
 
-  // Agregar esta función para renderizar los títulos de notificaciones
+  // Cambiar la función renderNotificationTitle
   const renderNotificationTitle = (item: any) => {
+    // Si hay senders, usar esos datos
+    if (item.senders && item.senders.length > 0) {
+      const mainUser = item.senders[0];
+      const otherCount = item.senders.length - 1;
+      
+      switch (item.type) {
+        case 'post_like':
+          return (
+            <Text style={styles.notificationTitle}>
+              <Text style={styles.boldText}>{mainUser.name}</Text>
+              <Text>{otherCount > 0 ? ` y ${otherCount} más` : ''} {otherCount > 0 ? 'han dado' : 'ha dado'} like a tu publicación</Text>
+            </Text>
+          );
+        
+        case 'post_comment':
+          return (
+            <Text style={styles.notificationTitle}>
+              <Text style={styles.boldText}>{mainUser.name}</Text>
+              <Text>{otherCount > 0 ? ` y ${otherCount} más` : ''} {otherCount > 0 ? 'han comentado' : 'ha comentado'} en tu publicación</Text>
+            </Text>
+          );
+
+        case 'forum_question_like':
+          return (
+            <Text style={styles.notificationTitle}>
+              <Text style={styles.boldText}>{mainUser.name}</Text>
+              <Text>{otherCount > 0 ? ` y ${otherCount} más` : ''} {otherCount > 0 ? 'han dado' : 'ha dado'} like a tu pregunta</Text>
+            </Text>
+          );
+        
+        case 'forum_question_comment':
+          return (
+            <Text style={styles.notificationTitle}>
+              <Text style={styles.boldText}>{mainUser.name}</Text>
+              <Text>{otherCount > 0 ? ` y ${otherCount} más` : ''} {otherCount > 0 ? 'han respondido' : 'ha respondido'} a tu pregunta</Text>
+            </Text>
+          );
+        
+        case 'forum_answer_like':
+          return (
+            <Text style={styles.notificationTitle}>
+              <Text style={styles.boldText}>{mainUser.name}</Text>
+              <Text>{otherCount > 0 ? ` y ${otherCount} más` : ''} {otherCount > 0 ? 'han dado' : 'ha dado'} like a tu respuesta</Text>
+            </Text>
+          );
+        
+        case 'forum_answer_comment':
+          return (
+            <Text style={styles.notificationTitle}>
+              <Text style={styles.boldText}>{mainUser.name}</Text>
+              <Text>{otherCount > 0 ? ` y ${otherCount} más` : ''} {otherCount > 0 ? 'han comentado' : 'ha comentado'} en una respuesta en tu post</Text>
+            </Text>
+          );
+        
+        case 'raite_request':
+          return (
+            <Text style={styles.notificationTitle}>
+              <Text style={styles.boldText}>{mainUser.name}</Text>
+              <Text> te ha solicitado un raite</Text>
+            </Text>
+          );
+        
+        default:
+          return <Text style={styles.notificationTitle}>Nueva notificación</Text>;
+      }
+    }
+    
+    // Código existente para notificaciones sin senders
     const userName = item.fromUserName || item.userName || 'Usuario';
     
     switch (item.type) {
@@ -186,6 +254,11 @@ export default function NotificationsScreen() {
   const handleNotificationPress = async (item: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
+    // Marcar como leída si es una notificación de Firestore
+    if (item.type !== 'message' && item.id) {
+      await markAsRead(item.id);
+    }
+    
     if (item.type === 'message') {
       // Navegar al chat
       router.push({
@@ -218,9 +291,13 @@ export default function NotificationsScreen() {
         }
       });
     } else if (item.type === 'raite_request') {
+      // Navegar al mapa y mostrar la solicitud de raite
       router.push({
         pathname: '/(drawer)/(tabs)/map',
-        params: { showRaiteRequest: item.contentId }
+        params: { 
+          showRaiteRequest: item.contentId,
+          fromUserId: item.fromUserId
+        }
       });
     }
   };

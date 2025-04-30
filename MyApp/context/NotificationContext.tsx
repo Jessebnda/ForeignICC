@@ -51,6 +51,7 @@ export interface Notification {
   read: boolean;
   relatedContentId?: string; // Para respuestas dentro de preguntas
   count?: number; // Para notificaciones agrupadas
+  senders?: { id: string; name: string; photo?: string }[]; // Añade esta línea
 }
 
 // Para mensajes
@@ -96,23 +97,35 @@ export const NotificationProvider: React.FC<{children: React.ReactNode}> = ({ ch
     const grouped = new Map<string, Notification>();
     
     notifs.forEach(notif => {
-      // Crear una clave para agrupar notificaciones similares
-      // Ejemplo: "post_like_123" para likes en el post con ID 123
-      const groupKey = `${notif.type}_${notif.contentId}_${notif.fromUserId}`;
+      // CAMBIO AQUÍ: Modificar la clave para incluir el contentId 
+      // Esto asegura que notificaciones de distintas publicaciones 
+      // no se agrupen juntas, aun siendo del mismo tipo
+      const groupKey = `${notif.type}_${notif.contentId}`;
       
       if (grouped.has(groupKey)) {
-        // Si ya existe, incrementar el contador
+        // Si ya existe una notificación para este tipo y contentId
         const existing = grouped.get(groupKey)!;
+        
+        // Asegurarnos de que 'senders' exista y sea un array
+        const currentSenders = existing.senders || [];
+        
+        // Añadir nuevo remitente si no está ya en la lista
+        const newSender = { id: notif.fromUserId, name: notif.fromUserName, photo: notif.fromUserPhoto };
+        const senderExists = currentSenders.some(sender => sender.id === newSender.id);
+        
         grouped.set(groupKey, {
           ...existing,
           count: (existing.count || 1) + 1,
-          timestamp: Math.max(existing.timestamp, notif.timestamp) // Usar el timestamp más reciente
+          timestamp: Math.max(existing.timestamp, notif.timestamp), // Usar el timestamp más reciente
+          read: existing.read && notif.read, // Marcar como leído solo si todas en el grupo lo están
+          senders: senderExists ? currentSenders : [...currentSenders, newSender] // Actualizar lista de remitentes
         });
       } else {
-        // Si no existe, añadirla con contador 1
+        // Si no existe, añadirla con contador 1 y lista de remitentes inicial
         grouped.set(groupKey, {
           ...notif,
-          count: 1
+          count: 1,
+          senders: [{ id: notif.fromUserId, name: notif.fromUserName, photo: notif.fromUserPhoto }]
         });
       }
     });
@@ -279,6 +292,25 @@ export const NotificationProvider: React.FC<{children: React.ReactNode}> = ({ ch
           }
         }
       }
+
+      // 3. AÑADIR ESTE BLOQUE: Marcar notificaciones de Firestore como leídas
+      const batch = writeBatch(firestore);
+      const firestoreQuery = query(
+        collection(firestore, 'notifications'),
+        where('toUserId', '==', currentUser.uid),
+        where('read', '==', false)
+      );
+      
+      const unreadNotifications = await getDocs(firestoreQuery);
+      
+      unreadNotifications.forEach(doc => {
+        batch.update(doc.ref, { read: true });
+      });
+      
+      if (!unreadNotifications.empty) {
+        await batch.commit();
+        console.log('Todas las notificaciones de Firestore marcadas como leídas');
+      }
       
       // Actualizar estado local inmediatamente sin esperar a los listeners
       setNotifications(prevNotifs => 
@@ -286,8 +318,6 @@ export const NotificationProvider: React.FC<{children: React.ReactNode}> = ({ ch
       );
       setMessageNotifications([]);
       setHasUnread(false);
-      
-      // Resto del código...
     } catch (error) {
       console.error('Error al marcar notificaciones como leídas:', error);
     }
@@ -296,9 +326,24 @@ export const NotificationProvider: React.FC<{children: React.ReactNode}> = ({ ch
   // Marcar una notificación específica como leída
   const markAsRead = async (notificationId: string) => {
     try {
-      await updateDoc(doc(firestore, 'notifications', notificationId), {
+      const notificationRef = doc(firestore, 'notifications', notificationId);
+      await updateDoc(notificationRef, {
         read: true
       });
+      
+      // Actualizar también el estado local
+      setNotifications(prevNotifs => 
+        prevNotifs.map(notif => 
+          notif.id === notificationId ? {...notif, read: true} : notif
+        )
+      );
+      
+      // Verificar si todavía hay notificaciones no leídas
+      const stillHasUnread = notifications.some(n => n.id !== notificationId && !n.read) || 
+        messageNotifications.length > 0;
+      setHasUnread(stillHasUnread);
+      
+      console.log('Notificación marcada como leída:', notificationId);
     } catch (error) {
       console.error('Error al marcar notificación como leída:', error);
     }

@@ -24,13 +24,16 @@ import { Image } from 'react-native';
 import { database } from '../../../firebase'; 
 import { set, ref as DatabaseRef, remove, onValue } from 'firebase/database';
 import MapView, { Marker, LatLng, Polyline } from 'react-native-maps';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useRaite } from '../../../context/RaiteContext';
 import { Ionicons } from '@expo/vector-icons';
 
 const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
 
 export default function MapScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  
   // Estados para filtros y marcadores (funcionalidad original)
   const [pendingTypes, setPendingTypes] = useState<string[]>([]);
   const [confirmedTypes, setConfirmedTypes] = useState<string[]>([]);
@@ -58,14 +61,44 @@ export default function MapScreen() {
   const { setHasActiveRaiteRequest } = useRaite();
   const mapRef = useRef<MapView>(null);
 
- 
-  const router = useRouter();
-  
   type FriendRaiteRequest = {
     friendId: string;
     friendName: string;
     to: LatLng;
   };
+
+  // NUEVO: Procesar parámetros cuando se llega desde una notificación
+  useEffect(() => {
+    if (params?.showRaiteRequest && params?.fromUserId) {
+      const requestId = params.showRaiteRequest as string;
+      const fromUserId = params.fromUserId as string;
+      
+      // Buscar la solicitud de raite en Realtime Database
+      const requestRef = DatabaseRef(database, `raiteRequests/${fromUserId}`);
+      onValue(requestRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const raiteData = snapshot.val();
+          if (raiteData && raiteData.status === 'pending') {
+            // Obtener datos del usuario solicitante
+            getDoc(doc(firestore, 'users', fromUserId)).then(userDoc => {
+              if (userDoc.exists()) {
+                const userData = userDoc.data();
+                const userName = userData?.name || 'Usuario';
+                
+                // Mostrar modal con la solicitud
+                setSelectedFriendRaite({
+                  friendId: fromUserId,
+                  friendName: userName,
+                  to: raiteData.to
+                });
+                setRaiteAlertModalVisible(true);
+              }
+            });
+          }
+        }
+      }, { onlyOnce: true });
+    }
+  }, [params]); // Nota que la dependencia cambia de router.params a params
 
   //Subir imgs a storage
   const uploadImages = async (uris: string[]) => {
@@ -218,6 +251,7 @@ export default function MapScreen() {
       console.error('❌ Error guardando lugar:', error);
     }
   };
+  
   //volver a fetchear ubis
   const fetchLocationsAgain = async () => {
     try {
@@ -266,17 +300,45 @@ export default function MapScreen() {
 
   const sendRaiteRequestRealtime = async () => {
     const userId = currentUserId; 
-    if (!userId || !userLocation || !selectedRaitePlace) return;
-  
-    const raiteData = {
-      from: userLocation,
-      to: selectedRaitePlace,
-      timestamp: Date.now(),
-      status: 'pending',
-      selectedFriends: friends, 
-    };
-  
-    await set(DatabaseRef(database, `raiteRequests/${userId}`), raiteData);
+    if (!userId || !userLocation || !selectedRaitePlace || selectedFriends.length === 0) return;
+
+    try {
+      // Datos para la solicitud de raite en Realtime Database (tu código actual)
+      const raiteData = {
+        from: userLocation,
+        to: selectedRaitePlace,
+        timestamp: Date.now(),
+        status: 'pending',
+        selectedFriends, 
+      };
+      
+      // Guardar en Realtime Database
+      await set(DatabaseRef(database, `raiteRequests/${userId}`), raiteData);
+      
+      // Obtener datos del usuario actual para la notificación
+      const currentUserDoc = await getDoc(doc(firestore, 'users', userId));
+      const currentUserData = currentUserDoc.data();
+      const currentUserName = currentUserData?.name || 'Usuario';
+      const currentUserPhoto = currentUserData?.photo || '';
+      
+      // Crear notificación en Firestore para cada amigo seleccionado
+      for (const friendId of selectedFriends) {
+        await createNotification({
+          type: 'raite_request',
+          fromUserId: userId,
+          fromUserName: currentUserName,
+          fromUserPhoto: currentUserPhoto,
+          toUserId: friendId,
+          contentId: userId, // Usamos userId como contentId para identificar la solicitud
+          contentText: `${currentUserName} necesita un raite. ¡Toca aquí para responder!`
+        });
+      }
+      
+      console.log('Notificaciones de raite enviadas a:', selectedFriends);
+    } catch (error) {
+      console.error('Error al enviar solicitud de raite:', error);
+      throw error;
+    }
   };
 
   const cancelRaiteRequestRealtime = async () => {
@@ -385,7 +447,6 @@ export default function MapScreen() {
       fetchFriendsData();
     }
   }, [friendIds]);  
-
 
   const handleApplyFilters = () => {
     setConfirmedTypes([...pendingTypes]);

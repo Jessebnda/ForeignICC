@@ -12,12 +12,18 @@ import { ref, onValue } from 'firebase/database';
 import { collection, query, where, onSnapshot, getCountFromServer } from 'firebase/firestore';
 import { useNotifications } from '../../../context/NotificationContext';
 
-export default function TabsLayout() {
+export default function TabLayout() {
   const [isAnonymous, setIsAnonymous] = useState<boolean | null>(null);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const navigation = useNavigation();
   const router = useRouter();
   const { hasActiveRaiteRequest } = useRaite();
+  const { notifications } = useNotifications();
+  
+  // Verificar si hay solicitudes de raite no leídas
+  const hasUnreadRaiteRequests = notifications.some(
+    notif => notif.type === 'raite_request' && !notif.read
+  );
 
   const openDrawer = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -155,7 +161,9 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="map" color={color} size={size} />
           ),
-          tabBarBadge: hasActiveRaiteRequest ? '!' : undefined, // 👈 badge en Mapa si hay raite
+          // Esta es la línea importante:
+          tabBarBadge: hasUnreadRaiteRequests ? "!" : undefined,
+          tabBarBadgeStyle: { backgroundColor: '#FF6B6B' }
         }}
       />
 
