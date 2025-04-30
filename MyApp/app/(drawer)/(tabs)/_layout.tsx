@@ -7,10 +7,12 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { DrawerActions } from '@react-navigation/native';
+import { RaiteProvider, useRaite } from '../../../context/RaiteContext'; 
 
 export default function TabsLayout() {
   const [isAnonymous, setIsAnonymous] = useState<boolean | null>(null);
   const navigation = useNavigation();
+  const { hasActiveRaiteRequest } = useRaite();
 
   const openDrawer = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -59,6 +61,7 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" color={color} size={size} />
           ),
+          tabBarBadge: hasActiveRaiteRequest ? '!' : undefined, // 👈 badge en Feed si hay raite
         }}
       />
 
@@ -70,6 +73,8 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="map" color={color} size={size} />
           ),
+          tabBarBadge: hasActiveRaiteRequest ? '!' : undefined, // 👈 badge en Feed si hay raite
+
         }}
       />
 
@@ -85,6 +90,8 @@ export default function TabsLayout() {
             : ({ color, size }) => (
                 <Ionicons name="people" color={color} size={size} />
               ),
+         tabBarBadge: hasActiveRaiteRequest ? '!' : undefined, // 👈 badge en Feed si hay raite
+
         }}
       />
 
@@ -99,6 +106,7 @@ export default function TabsLayout() {
             : ({ color, size }) => (
                 <Ionicons name="chatbubble" color={color} size={size} />
               ),
+              tabBarBadge: hasActiveRaiteRequest ? '!' : undefined, // 👈 badge en Feed si hay raite
         }}
       />
 

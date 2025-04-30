@@ -485,7 +485,7 @@ export default function MapScreen() {
       setSelectedFriendRaite(null);
   
       // Navegar al chat
-      router.push(`/extra/chat?uid=${selectedFriendRaite.friendId}`);
+      router.push(`/extra/chat?friendId=${selectedFriendRaite.friendId}&friendName=${encodeURIComponent(selectedFriendRaite.friendName)}`);
     } catch (error) {
       console.error('❌ Error al aceptar raite:', error);
       Alert.alert('Error', 'No se pudo aceptar la solicitud.');
