@@ -14,7 +14,8 @@ import {
     KeyboardAvoidingView,
     Platform,
     RefreshControl,
-    ImageSourcePropType // Import ImageSourcePropType
+    ImageSourcePropType,
+    Alert
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { Post, Comment } from '../../../models/Post'; // Ensure these types match your data
@@ -29,7 +30,8 @@ import {
     updateDoc,
     deleteField,
     serverTimestamp,
-    addDoc
+    addDoc,
+    deleteDoc
     // updateDoc, addDoc, serverTimestamp, deleteField
 } from 'firebase/firestore';
 import { firestore } from '../../../firebase';
@@ -53,7 +55,16 @@ export default function ProfileScreen() {
     const [liked, setLiked] = useState(false);
     const [loadingComments, setLoadingComments] = useState(false);
     const [currentUserId, setCurrentUserId] = useState('');
-    
+
+    const deletePost = async (postId: string) => {
+        try {
+          await deleteDoc(doc(firestore, 'feedPosts', postId));
+          setSelectedPost(null); // cerrar modal
+          fetchUserPosts(); // recargar feed
+        } catch (error) {
+          console.error('❌ Error al eliminar post:', error);
+        }
+      };
 
     // --- Fetch User Posts Function (Revised) ---
     const fetchUserPosts = useCallback(async () => {
@@ -211,6 +222,17 @@ export default function ProfileScreen() {
         }
       };
 
+      const deleteComment = async (commentId: string) => {
+          if (!selectedPost) return; 
+        
+          try {
+            await deleteDoc(doc(firestore, 'feedPosts', selectedPost.id, 'comments', commentId));
+            setComments((prev) => prev.filter((c) => c.id !== commentId));
+          } catch (error) {
+            console.error('❌ Error al eliminar comentario:', error);
+          }
+        };
+
     //likes
         const toggleLike = async () => {
           if (!selectedPost || !currentUserId) return;
@@ -354,6 +376,7 @@ export default function ProfileScreen() {
                       visible={!!selectedPost}
                       onRequestClose={closeModal}
                     >
+
                       <KeyboardAvoidingView
                         behavior={Platform.OS === "ios" ? "padding" : "height"}
                         style={styles.detailOverlay}
@@ -383,24 +406,68 @@ export default function ProfileScreen() {
                           {/* Content/Caption */}
                           <View style={styles.detailContent}>
                             <Text style={styles.detailCaption}>{selectedPost.content}</Text>
+
+                            {selectedPost && (
+                            <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 8 }}>
+                            <TouchableOpacity onPress={() => deletePost(selectedPost.id)}>
+                            <Ionicons name="trash-outline" size={24} color="red" />
+                            </TouchableOpacity>
+                            </View>
+                        )}
               
                      <Text style={styles.detailContent}>{selectedPost.likeCount} Me gusta</Text>
                             
               
                         <View style={{ width: '100%', marginTop: 16 }}>
-                          {loadingComments ? (
-                            <ActivityIndicator color="#bb86fc" />
-                          ) : comments.length > 0 ? (
-                            comments.map((comment) => (
-                              <View key={comment.id} style={styles.commentBubble}>
-                                <Text style={styles.commentText}>🗨 {comment.text}</Text>
-                              </View>
-                            ))
-                          ) : (
-                            <Text style={styles.noDataText}>No hay comentarios aún.</Text>
-                          )}
+                    {loadingComments ? (
+                    <ActivityIndicator color="#bb86fc" />
+                    ) : comments.length > 0 ? (
+                    comments.map((comment) => (
+                        <View key={comment.id} style={styles.commentCard}>
+                        <Image
+                            source={
+                            comment.user?.image
+                                ? typeof comment.user.image === 'string'
+                                ? { uri: comment.user.image }
+                                : comment.user.image
+                                : require('../../../assets/images/img7.jpg')
+                            }
+                            style={styles.commentUserImage}
+                        />
+                        <View style={styles.commentContent}>
+                            <Text style={styles.commentUserName}>{comment.user?.name || 'Usuario'}</Text>
+                            <Text style={styles.commentText}> {comment.text}</Text>
                         </View>
-                          </View>
+        
+                        {comment.user?.id === currentUserId && (
+                            <TouchableOpacity
+                            onPress={() =>
+                                Alert.alert(
+                                'Eliminar comentario',
+                                '¿Quieres eliminar este comentario?',
+                                [
+                                    { text: 'Cancelar', style: 'cancel' },
+                                    {
+                                    text: 'Eliminar',
+                                    style: 'destructive',
+                                    onPress: () => deleteComment(comment.id),
+                                    },
+                                ]
+                                )
+                            }
+                            style={{ padding: 4, marginLeft: 4 }}
+                            >
+                            <Ionicons name="trash-outline" size={20} color="red" />
+                            </TouchableOpacity>
+                        )}
+                        </View>
+                    ))
+                    ) : (
+                    <Text style={styles.noDataText}>No hay comentarios aún.</Text>
+                    )}
+                </View>
+                </View>
+                          
                         </ScrollView>
               
                         {/* Comment Input */}
@@ -634,4 +701,27 @@ const styles = StyleSheet.create({
         marginRight: 10,
         fontSize: 15,
     },
+    commentCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginBottom: 12,
+        backgroundColor: '#bb86fc',
+        borderRadius: 12,
+        padding: 10,
+        gap: 8,
+      },
+      commentUserImage: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+      },
+      commentContent: {
+        flex: 1,
+        backgroundColor: '#bb86fc',
+      },
+      commentUserName: {
+        fontWeight: 'bold',
+        fontSize: 14,
+        color: '#333',
+      },
 });
