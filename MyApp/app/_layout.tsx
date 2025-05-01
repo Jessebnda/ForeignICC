@@ -1,31 +1,22 @@
 // app/_layout.tsx
 import { Stack } from 'expo-router';
-import { UserProvider } from '../context/UserContext'; // Adjust path if needed
+import { UserProvider } from '../context/UserContext';
+import { NotificationProvider } from '../context/NotificationContext';
+import { RaiteProvider } from '../context/RaiteContext';
 
 export default function RootLayout() {
   return (
-    // Wrap the entire app with the UserProvider
-    <UserProvider>
-      <Stack 
-        screenOptions={{
-          headerShown: false, // Hide header for the root stack by default
-        }}
-      >
-        {/* Define screens/groups managed by this stack */}
-        {/* This screen points to your main drawer navigation */}
-        <Stack.Screen name="(drawer)" /> 
-        
-        {/* This screen points to your initial loading/redirect screen */}
-        <Stack.Screen name="index" /> 
-
-        {/* If 'extra' screens should be presented modally over everything, 
-            you might define them here too, or handle them within (drawer) */}
-        {/* Example for modal presentation: */}
-        {/* <Stack.Screen name="extra" options={{ presentation: 'modal' }} /> */}
-
-        {/* Add other top-level screens/groups if necessary */}
-        
-      </Stack>
-    </UserProvider>
+    <NotificationProvider>
+      <UserProvider>
+        <RaiteProvider>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="login" options={{ gestureEnabled: false }} />
+            <Stack.Screen name="(drawer)" options={{ gestureEnabled: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="index" options={{ gestureEnabled: false }} />
+          </Stack>
+        </RaiteProvider>
+      </UserProvider>
+    </NotificationProvider>
   );
 }

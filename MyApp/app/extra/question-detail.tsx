@@ -6,6 +6,7 @@ import { addDoc, collection, doc, getDoc, onSnapshot, query, orderBy, Timestamp,
 import { firestore } from '../../firebase';
 import { getAuth } from 'firebase/auth';
 import { useUser } from '../../context/UserContext';
+import { createNotification } from '../../services/notificationService';
 
 interface ForumUser {
   id: string;
@@ -134,6 +135,27 @@ export default function QuestionDetailScreen() {
       });
       
       setNewAnswer('');
+
+      // Al agregar un comentario:
+
+      if (question && user && question.user.id) {  // Cambiar question.userId por question.user.id
+        try {
+          await createNotification({
+            type: 'forum_question_comment',
+            fromUserId: String(user.uid),
+            fromUserName: userProfile?.name || user?.displayName || 'Usuario',
+            fromUserPhoto: userProfile?.photo || '',
+            toUserId: String(question.user.id), // Cambiar question.userId por question.user.id
+            contentId: String(questionId),
+            contentText: newAnswer.trim().substring(0, 100),
+            relatedContentId: String(questionId)
+          });
+          console.log("Notificación de comentario enviada");
+        } catch (err) {
+          console.error("Error al crear notificación de comentario:", err);
+        }
+      }
+
     } catch (error) {
       console.error('Error al enviar respuesta:', error);
     }
