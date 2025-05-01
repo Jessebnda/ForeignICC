@@ -8,10 +8,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
-  Text
+  Text,
+  Alert
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { collection, getDocs, orderBy, query, deleteField, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, deleteField, doc, addDoc, serverTimestamp, updateDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { firestore } from '../../../firebase';
 import 'react-native-reanimated';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -19,7 +20,6 @@ import { TextInput } from 'react-native';
 import { Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { addDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { ScrollView } from 'react-native';
 import { RefreshControl } from 'react-native';
@@ -314,8 +314,17 @@ export default function FeedScreen() {
   const goToCreatePost = () => {
     router.push({ pathname: '/extra/crearpubli' });
   };
-  
 
+  const deletePost = async (postId: string) => {
+    try {
+      await deleteDoc(doc(firestore, 'feedPosts', postId));
+      setSelectedPost(null); // cerrar modal
+      fetchPosts(); // recargar feed
+    } catch (error) {
+      console.error('❌ Error al eliminar post:', error);
+    }
+  };
+  
   const goToPostDetail = async (item: any) => {
   setSelectedPost(item);
   await loadComments(item.id);
@@ -329,10 +338,10 @@ export default function FeedScreen() {
       text: newComment.trim(),
       created_at: serverTimestamp(),
       user: {
-        name: 'Tú',
-        image: require('../../../assets/images/img7.jpg'), // Reemplaza si tienes auth
+        id: currentUserId, // NECESARIO
+        name: currentUserData?.name || 'Tú',
+        image: currentUserData?.photo || require('../../../assets/images/img7.jpg'),
       },
-      likes: 0,
     };
 
     try {
@@ -362,6 +371,17 @@ export default function FeedScreen() {
     }
   };
 
+  const deleteComment = async (commentId: string) => {
+    if (!selectedPost) return; 
+  
+    try {
+      await deleteDoc(doc(firestore, 'feedPosts', selectedPost.id, 'comments', commentId));
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (error) {
+      console.error('❌ Error al eliminar comentario:', error);
+    }
+  };
+  
   const loadComments = async (postId: string) => {
     try {
       const q = query(
@@ -449,7 +469,9 @@ export default function FeedScreen() {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.detailOverlay}
           >
-            <ScrollView style={styles.detailScroll}>
+            <ScrollView style={styles.detailScroll}
+            contentContainerStyle={{ paddingBottom: 80 }}
+            >
               <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
                 <Ionicons name="close-circle" size={32} color="#aaa" />
               </TouchableOpacity>
@@ -470,6 +492,14 @@ export default function FeedScreen() {
                   style={styles.detailImage}
                 />
               )}
+
+              {selectedPost?.user.id === currentUserId && (
+              <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 8 }}>
+            <TouchableOpacity onPress={() => deletePost(selectedPost.id)}>
+              <Ionicons name="trash-outline" size={24} color="red" />
+            </TouchableOpacity>
+            </View>
+          )}
   
               {/* Content/Caption */}
               <View style={styles.detailContent}>
@@ -486,23 +516,58 @@ export default function FeedScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <Text style={styles.actionText}>{selectedPost.likeCount} Me gusta</Text>
-  
-            <View style={{ width: '100%', marginTop: 16 }}>
-              {loadingComments ? (
-                <ActivityIndicator color="#bb86fc" />
-              ) : comments.length > 0 ? (
-                comments.map((comment) => (
-                  <View key={comment.id} style={styles.commentBubble}>
-                    <Text style={styles.commentText}>🗨 {comment.text}</Text>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.noDataText}>No hay comentarios aún.</Text>
-              )}
-            </View>
+            <Text style={styles.actionText}>{selectedPost.likeCount} Me gusta</Text>
+            
+          <View style={{ width: '100%', marginTop: 16 }}>
+          {loadingComments ? (
+            <ActivityIndicator color="#bb86fc" />
+          ) : comments.length > 0 ? (
+            comments.map((comment) => (
+              <View key={comment.id} style={styles.commentCard}>
+                <Image
+                  source={
+                    comment.user?.image
+                      ? typeof comment.user.image === 'string'
+                        ? { uri: comment.user.image }
+                        : comment.user.image
+                      : require('../../../assets/images/img7.jpg')
+                  }
+                  style={styles.commentUserImage}
+                />
+                <View style={styles.commentContent}>
+                  <Text style={styles.commentUserName}>{comment.user?.name || 'Usuario'}</Text>
+                  <Text style={styles.commentText}> {comment.text}</Text>
+                </View>
+
+                {comment.user?.id === currentUserId && (
+                  <TouchableOpacity
+                    onPress={() =>
+                      Alert.alert(
+                        'Eliminar comentario',
+                        '¿Quieres eliminar este comentario?',
+                        [
+                          { text: 'Cancelar', style: 'cancel' },
+                          {
+                            text: 'Eliminar',
+                            style: 'destructive',
+                            onPress: () => deleteComment(comment.id),
+                          },
+                        ]
+                      )
+                    }
+                    style={{ padding: 4, marginLeft: 4 }}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="red" />
+                  </TouchableOpacity>
+                )}
               </View>
-            </ScrollView>
+            ))
+          ) : (
+            <Text style={styles.noDataText}>No hay comentarios aún.</Text>
+          )}
+        </View>
+        </View>
+        </ScrollView>
   
             {/* Comment Input */}
             <View style={styles.commentInputRow}>
@@ -519,7 +584,8 @@ export default function FeedScreen() {
             </View>
           </KeyboardAvoidingView>
         </Modal>
-      )}
+        
+        )}
   
       {/* crear post bton */}
       {!isKeyboardVisible && (
@@ -528,6 +594,7 @@ export default function FeedScreen() {
         </TouchableOpacity>
       )}
     </View>
+    
   );
 }
 const styles = StyleSheet.create({
@@ -779,7 +846,7 @@ sectionTitle: {
   paddingHorizontal: 16,
 },
 commentUser: {
-  color: '#aaa',
+  color: '#eee',
   fontWeight: 'bold',
   fontSize: 13,
   marginBottom: 4,
@@ -791,5 +858,28 @@ noDataText: {
   marginTop: 10,
   width: '100%',
   paddingHorizontal: 16,
+},
+commentCard: {
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  marginBottom: 12,
+  backgroundColor: '#bb86fc',
+  borderRadius: 12,
+  padding: 10,
+  gap: 8,
+},
+commentUserImage: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+},
+commentContent: {
+  flex: 1,
+  backgroundColor: '#bb86fc',
+},
+commentUserName: {
+  fontWeight: 'bold',
+  fontSize: 14,
+  color: '#333',
 },
 });
