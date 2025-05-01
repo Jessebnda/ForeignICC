@@ -458,7 +458,6 @@ export default function FeedScreen() {
   
       {/* Post Detail Modal */}
       {selectedPost && (
-        
         <Modal
           animationType="slide"
           transparent={true}
@@ -477,13 +476,21 @@ export default function FeedScreen() {
               </TouchableOpacity>
   
               {/* Author Info */}
-              <View style={styles.detailAuthor}>
-                <Image
-                   source={selectedPost.user.image || require('../../../assets/images/img7.jpg')}
-                  style={styles.detailAuthorImage}
-                />
-                <Text style={styles.detailAuthorName}>{selectedPost.user.name}</Text>
-              </View>
+              <TouchableOpacity
+              onPress={() => {
+                setSelectedPost(null);
+                router.push(`/extra/perfil?uid=${selectedPost.user.id}`);
+              }}
+              style={styles.authorContainer}
+            >
+              <Image
+                source={
+                  selectedPost.user.image || require('../../../assets/images/img7.jpg')
+                }
+                style={styles.detailAuthorImage}
+              />
+              <Text style={styles.detailAuthorName}>{selectedPost.user.name}</Text>
+            </TouchableOpacity>
   
               {/* Image */}
               {selectedPost.image && (
@@ -881,5 +888,11 @@ commentUserName: {
   fontWeight: 'bold',
   fontSize: 14,
   color: '#333',
+},
+authorContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10, // si usas React Native >= 0.71
+  marginBottom: 12,
 },
 });
