@@ -6,6 +6,7 @@ import { doc, getDoc, collection, addDoc, onSnapshot, query, orderBy, Timestamp,
 import { getAuth } from 'firebase/auth';
 import { firestore } from '../../firebase';
 import { useUser } from '../../context/UserContext';
+import { createNotification } from '../../services/notificationService';
 
 interface ForumUser {
   id: string;
@@ -18,6 +19,7 @@ interface ForumAnswer {
   content: string;
   timestamp: any;
   user: ForumUser;
+  userId: string; // Agregar esta propiedad
   likes: number;
 }
 
@@ -94,7 +96,7 @@ export default function AnswerDetailScreen() {
   };
 
   const addComment = async () => {
-    if (!newComment.trim() || !user || !questionId || !answerId) return;
+    if (!newComment.trim() || !user || !answer) return; // Añadir verificación de answer
     
     try {
       const comment = {
@@ -102,7 +104,7 @@ export default function AnswerDetailScreen() {
         timestamp: Timestamp.now(),
         user: {
           id: user.uid,
-          name: userProfile?.name || user.displayName || 'Usuario sin nombre',
+          name: userProfile?.name || user?.displayName || 'Usuario sin nombre',
           photo: userProfile?.photo || '',
         },
         likes: 0
@@ -122,8 +124,31 @@ export default function AnswerDetailScreen() {
       );
       
       setNewComment('');
+
+      // Verificación segura
+      if (answer && user && answer.userId && user.uid) {
+        console.log("Datos de notificación respuesta:", {
+          fromUserId: user.uid,
+          toUserId: answer.userId,
+        });
+        
+        try {
+          await createNotification({
+            type: 'forum_answer_comment',
+            fromUserId: String(user.uid),
+            fromUserName: userProfile?.name || user?.displayName || 'Usuario',
+            fromUserPhoto: userProfile?.photo || '',
+            toUserId: String(answer.userId),
+            contentId: String(answerId),
+            contentText: newComment.trim().substring(0, 100),
+            relatedContentId: String(questionId)
+          });
+        } catch (err) {
+          console.error("Error al crear notificación:", err);
+        }
+      }
     } catch (error) {
-      console.error('Error al añadir comentario:', error);
+      console.error("Error al añadir comentario:", error);
     }
   };
 
@@ -131,20 +156,34 @@ export default function AnswerDetailScreen() {
     if (!user || !questionId || !answerId || !answer) return;
     
     try {
-      const answerRef = doc(
-        firestore, 'forumQuestions', questionId as string, 'answers', answerId as string
-      );
+      // Tu código existente para actualizar el like...
       
-      await updateDoc(answerRef, {
-        likes: isLiked ? (answer.likes || 1) - 1 : (answer.likes || 0) + 1
-      });
+      // Primero recupera explícitamente todos los datos de la respuesta
+      // para asegurar que tenemos toda la información
+      const answerRef = doc(firestore, 'forumQuestions', questionId as string, 'answers', answerId as string);
+      const answerSnap = await getDoc(answerRef);
       
-      setIsLiked(!isLiked);
-      setAnswer(prev => 
-        prev ? {...prev, likes: isLiked ? (prev.likes - 1) : (prev.likes + 1)} : null
-      );
+      if (answerSnap.exists() && answerSnap.data().user && answerSnap.data().user.id) {
+        const answerUserId = answerSnap.data().user.id;
+        
+        // Asegurar que tenemos un ID válido antes de crear la notificación
+        if (answerUserId !== user.uid) {
+          await createNotification({
+            type: 'forum_answer_like',
+            fromUserId: user.uid,
+            fromUserName: userProfile?.name || user?.displayName || 'Usuario',
+            fromUserPhoto: userProfile?.photo || '',
+            toUserId: answerUserId, // Usar el ID recuperado explícitamente
+            contentId: String(answerId),
+            contentText: answer.content?.substring(0, 100) || '',
+            relatedContentId: String(questionId)
+          });
+        }
+      } else {
+        console.error("No se encontró userId en la respuesta");
+      }
     } catch (error) {
-      console.error('Error al actualizar like:', error);
+      console.error("Error al dar like a la respuesta:", error);
     }
   };
 
