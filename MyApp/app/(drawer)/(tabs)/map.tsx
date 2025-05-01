@@ -264,6 +264,8 @@ export default function MapScreen() {
   type Friend = { id: string; name: string; };
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
+  const [raiteTimeoutId, setRaiteTimeoutId] = useState<NodeJS.Timeout | null>(null);
+
 
   const sendRaiteRequestRealtime = async () => {
     const userId = currentUserId; 
@@ -447,7 +449,7 @@ export default function MapScreen() {
   const sendRaiteRequest = async () => {
     try {
       await sendRaiteRequestRealtime(); 
-      Alert.alert('Solicitud Enviada', `Se ha enviado la solicitud de raite a: ${friends.join(', ')}`);
+      Alert.alert('Solicitud Enviada');
     } catch (error) {
       console.error('❌ Error enviando raite:', error);
       Alert.alert('Error', 'No se pudo enviar la solicitud de raite.');
@@ -460,12 +462,31 @@ export default function MapScreen() {
   };   
 
   const toggleRaiteMode = () => {
-    setIsRaiteActive(prev => !prev);
-    if (isRaiteActive) {
-      setSelectedRaitePlace(null);
-      setRaisteConfirmModalVisible(true);
-      setFriendSelectionModalVisible(false);
-    }
+    setIsRaiteActive((prev) => {
+      const newState = !prev;
+  
+      if (newState) {
+        const timeoutId = setTimeout(() => {
+          setIsRaiteActive(false);
+          setSelectedRaitePlace(null);
+          setRaisteConfirmModalVisible(false);
+          setFriendSelectionModalVisible(false);
+        }, 15 * 60 * 1000); // 15 minutos
+  
+        setRaiteTimeoutId(timeoutId);
+      } else {
+        if (raiteTimeoutId) {
+          clearTimeout(raiteTimeoutId);
+          setRaiteTimeoutId(null);
+        }
+  
+        setSelectedRaitePlace(null);
+        setRaisteConfirmModalVisible(true);
+        setFriendSelectionModalVisible(false);
+      }
+  
+      return newState;
+    });
   };
 
   const handleAcceptRaite = async () => {

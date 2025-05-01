@@ -63,7 +63,6 @@ export default function ProfileScreen() {
             return;
         }
 
-        console.log("ProfileScreen - Fetching posts for user:", user.uid);
         setLoadingPosts(true);
         try {
             const postsQuery = query(
@@ -116,7 +115,6 @@ export default function ProfileScreen() {
                 }
             }
 
-            console.log("ProfileScreen - Fetched user posts count:", userPosts.length);
             setPosts(userPosts);
 
         } catch (error) {
@@ -164,12 +162,7 @@ export default function ProfileScreen() {
 
     // --- Modal Handlers (Simplified Placeholders) ---
     const handlePostPress = (post: Post) => {
-        console.log("Opening post:", post.id);
         setSelectedPost(post);
-        // Reset/Load modal states here (likes, comments)
-        // Example: Check if current user liked this specific post
-        // setLiked(!!post.likes?.[user?.uid]);
-        // loadComments(post.id);
     };
 
     const loadComments = async (postId: string) => {

@@ -132,19 +132,16 @@ export default function FeedScreen() {
   useEffect(() => {
     const fetchCurrentUserData = async () => {
       const user = getAuth().currentUser;
-      console.log('🔎 Intentando obtener usuario autenticado:', user);
   
       if (user) {
         setCurrentUserId(user.uid);
   
         const userDoc = await getDoc(doc(firestore, 'users', user.uid));
-        console.log('📄 Documento de usuario Firestore:', userDoc.exists() ? userDoc.data() : 'No existe');
   
         if (userDoc.exists()) {
           setCurrentUserData(userDoc.data());
         }
       } else {
-        console.log('⚠️ No hay usuario autenticado.');
       }
     };
   
@@ -196,7 +193,6 @@ export default function FeedScreen() {
                 };
               }
             } catch (error) {
-              console.error(`❌ Error cargando usuario ${userId}:`, error);
             }
           }
     
@@ -227,7 +223,6 @@ export default function FeedScreen() {
           post.user.university === myUniversity
         );
         
-        console.log(friendFiltered);
     
         setFriendPosts(friendFiltered);
         setUniversityPosts(universityFiltered);
