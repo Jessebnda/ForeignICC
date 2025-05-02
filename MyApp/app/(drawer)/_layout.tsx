@@ -33,7 +33,6 @@ const customTitles: Record<string, string> = {
   contact: "Contacto",
   faq: "Preguntas Frecuentes",
   about: "Sobre Nosotros",
-  "settings/index": "Configuración",
 };
 
 export default function DrawerLayout() {
@@ -52,7 +51,6 @@ export default function DrawerLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       {userId && (
         <Drawer
-            //@ts-ignore
           screenOptions={({ route }) => ({
             headerShown: Object.keys(customTitles).includes(route.name),
             title: customTitles[route.name] || route.name,
@@ -122,14 +120,14 @@ function CustomDrawerContent({ userId }: { userId: string }) {
     { title: "User", icon: "account", path: '/(tabs)/profile' },
     { title: "Messages", icon: "message", path: 'extra/messages' }, 
     { title: "Friend request", icon: "account-plus", path: '/extra/AmigosScreen' },
-    { title: "Configuración", icon: "cog", path: '/settings' },
+    { title: "Configuración", icon: "cog", path: '/settings' },  // Esta línea debe apuntar a '/settings'
   ];
 
   const menuItemsAdmin: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
     { title: "User", icon: "account", path: '/(tabs)/profile' },
     { title: "Messages", icon: "message", path: '/extra/messages' }, 
     { title: "Friend request", icon: "account-plus", path: '/extra/AmigosScreen' },
-    { title: "Configuración", icon: "cog", path: '/settings' },
+    { title: "Configuración", icon: "cog", path: '/settings' },  // Esta línea debe apuntar a '/settings'
     { title: "Dashboard", icon: "powershell", path: '/(adminTabs)' },
   ];
 
