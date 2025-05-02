@@ -7,6 +7,7 @@ import { firestore } from '../../firebase';
 import { getAuth } from 'firebase/auth';
 import { useUser } from '../../context/UserContext';
 import { createNotification } from '../../services/notificationService';
+import { formatTimeAgo } from '../../utils/formatters';
 
 interface ForumUser {
   id: string;
@@ -32,7 +33,7 @@ interface ForumAnswer {
 
 export default function QuestionDetailScreen() {
   const router = useRouter();
-  const { questionId } = useLocalSearchParams();
+  const { questionId, scrollToAnswerId } = useLocalSearchParams();
   const [question, setQuestion] = useState<ForumQuestion | null>(null);
   const [answers, setAnswers] = useState<ForumAnswer[]>([]);
   const [newAnswer, setNewAnswer] = useState('');
@@ -171,6 +172,13 @@ export default function QuestionDetailScreen() {
     });
   };
 
+  // Si necesitas navegar a perfil desde un item:
+  const goToUserProfile = (userId: string) => {
+    if (userId) {
+      router.push(`/extra/perfil?uid=${userId}`);
+    }
+  };
+
   const renderAvatar = (source: string) => {
     if (source && (source.startsWith('http') || source.startsWith('data:'))) {
       return { uri: source };
@@ -202,19 +210,20 @@ export default function QuestionDetailScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.questionCard}>
-        <View style={styles.questionHeader}>
-          <Image 
-            source={renderAvatar(question.user.photo)} 
-            style={styles.questionAvatar} 
-          />
-          <View style={styles.questionUser}>
-            <Text style={styles.userName}>{question.user.name}</Text>
-            <Text style={styles.timestamp}>
-              {question.timestamp?.toDate ? 
-                new Date(question.timestamp.toDate()).toLocaleString() : 
-                '...'}
-            </Text>
-          </View>
+        <View style={styles.cardHeader}>
+          <TouchableOpacity 
+            style={styles.userInfo}
+            onPress={() => router.push(`/extra/perfil?uid=${question.user?.id}`)}
+          >
+            <Image 
+              source={renderAvatar(question.user?.photo)} 
+              style={styles.avatar} 
+            />
+            <View style={styles.questionUser}>
+              <Text style={styles.userName}>{question.user?.name}</Text>
+              <Text style={styles.timestamp}>{formatTimeAgo(question.timestamp)}</Text>
+            </View>
+          </TouchableOpacity>
         </View>
         <Text style={styles.questionTitle}>{question.title}</Text>
       </View>
@@ -242,21 +251,21 @@ export default function QuestionDetailScreen() {
           )
         }
         renderItem={({ item }) => (
-          <TouchableOpacity 
-            style={styles.answerCard} 
-            onPress={() => goToAnswerDetail(item)}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity key={item.id} style={styles.answerCard} onPress={() => goToAnswerDetail(item)}>
             <View style={styles.answerHeader}>
-              <Image source={renderAvatar(item.user.photo)} style={styles.avatar} />
-              <View style={styles.answerMeta}>
-                <Text style={styles.userName}>{item.user.name}</Text>
-                <Text style={styles.timestamp}>
-                  {item.timestamp?.toDate ? 
-                    new Date(item.timestamp.toDate()).toLocaleString() : 
-                    '...'}
-                </Text>
-              </View>
+              <TouchableOpacity 
+                onPress={(e) => {
+                  e.stopPropagation(); // Evitar que se active la navegación a la respuesta
+                  router.push(`/extra/perfil?uid=${item.user?.id}`);
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center' }}
+              >
+                <Image source={renderAvatar(item.user?.photo)} style={styles.avatar} />
+                <View>
+                  <Text style={styles.userName}>{item.user?.name}</Text>
+                  <Text style={styles.timestamp}>{formatTimeAgo(item.timestamp)}</Text>
+                </View>
+              </TouchableOpacity>
             </View>
             <Text style={styles.answerText}>{item.content}</Text>
             <View style={styles.answerFooter}>
@@ -335,14 +344,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e1e1e',
     padding: 16,
   },
-  questionHeader: {
+  cardHeader: {
     flexDirection: 'row',
     marginBottom: 16,
   },
-  questionAvatar: {
-    width: 48, 
-    height: 48, 
-    borderRadius: 24, 
+  avatar: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
     marginRight: 12,
     borderWidth: 2,
     borderColor: '#bb86fc',
@@ -378,14 +387,6 @@ const styles = StyleSheet.create({
   answerHeader: {
     flexDirection: 'row',
     marginBottom: 12,
-  },
-  avatar: { 
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
-    marginRight: 12,
-    borderWidth: 2,
-    borderColor: '#bb86fc',
   },
   answerMeta: {
     justifyContent: 'center',
@@ -471,5 +472,9 @@ const styles = StyleSheet.create({
   emptySuggestion: {
     color: '#888',
     fontSize: 14,
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

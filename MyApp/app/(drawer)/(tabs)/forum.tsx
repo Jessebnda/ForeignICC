@@ -6,6 +6,7 @@ import { collection, addDoc, query, orderBy, onSnapshot, Timestamp, getDocs } fr
 import { firestore } from '../../../firebase';
 import { getAuth } from 'firebase/auth';
 import { useUser } from '../../../context/UserContext';
+import { formatTimeAgo } from '../../../utils/formatters';
 
 interface ForumUser {
   id: string;
@@ -143,15 +144,19 @@ export default function ForumScreen() {
           >
             <View style={styles.cardHeader}>
               <View style={styles.userInfo}>
-                <Image source={renderAvatar(item.user.photo)} style={styles.avatar} />
-                <View>
-                  <Text style={styles.userName}>{item.user.name}</Text>
-                  <Text style={styles.timestamp}>
-                    {item.timestamp?.toDate ? 
-                      new Date(item.timestamp.toDate()).toLocaleString() : 
-                      'Hace un momento'}
-                  </Text>
-                </View>
+                <TouchableOpacity 
+                  style={{ flexDirection: 'row', alignItems: 'center' }}
+                  onPress={() => router.push(`/extra/perfil?uid=${item.user.id}`)}
+                >
+                  <Image 
+                    source={renderAvatar(item.user.photo)} 
+                    style={styles.avatar} 
+                  />
+                  <View>
+                    <Text style={styles.userName}>{item.user.name}</Text>
+                    <Text style={styles.timestamp}>{formatTimeAgo(item.timestamp)}</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             </View>
 

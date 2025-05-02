@@ -4,10 +4,12 @@
 // 2. Cargar sus publicaciones, no las del usuario autenticado.
 // 3. Quitar la lógica de edición de perfil.
 
-import { useLocalSearchParams } from 'expo-router';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { formatTimeAgo } from '../../utils/formatters';
+import { getAuth } from 'firebase/auth';
 import { doc, getDoc, collection, getDocs, query, orderBy, deleteDoc, updateDoc, addDoc, serverTimestamp, deleteField } from 'firebase/firestore';
 import { firestore } from '@/firebase';
-import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -43,6 +45,7 @@ type Post = {
   };
 
 export default function AmigoProfileScreen() {
+  const router = useRouter();
   const { uid } = useLocalSearchParams();
   const [userData, setUserData] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
@@ -149,66 +152,126 @@ export default function AmigoProfileScreen() {
   if (loading) return <ActivityIndicator style={{ marginTop: 50 }} />;
 
   return (
-    <ScrollView style={{ backgroundColor: '#121212' }}>
-      <View style={{ alignItems: 'center', padding: 20 }}>
-        <Image
-          source={userData?.photo ? { uri: userData.photo } : defaultImage}
-          style={{ width: 100, height: 100, borderRadius: 50 }}
-        />
-        <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold', marginTop: 10 }}>{userData?.name}</Text>
-        <Text style={{ color: 'gray' }}>{userData?.university}</Text>
-      </View>
+  <ScrollView style={styles.container}>
+    {/* Profile Header */}
+    <View style={styles.profileHeader}>
+      <Image
+        source={userData?.photo ? { uri: userData.photo } : defaultImage}
+        style={styles.profileImage}
+      />
+      <Text style={styles.profileName}>{userData?.name || 'Usuario'}</Text>
+      <Text style={styles.profileInfo}>{userData?.university || 'Universidad no especificada'}</Text>
+      
+      {/* No incluir botón de editar aquí */}
+    </View>
 
-      <View style={{ paddingHorizontal: 16 }}>
+    {/* Interests */}
+    {userData?.interests && userData.interests.length > 0 && (
+      <View style={styles.interestsContainer}>
+        <Text style={styles.sectionTitle}>Intereses</Text>
+        <View style={styles.interestsList}>
+          {userData.interests.map((interest: string) => (
+            <View key={interest} style={styles.interestChip}>
+              <Text style={styles.interestText}>{interest}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    )}
+
+    {/* Posts Grid */}
+    <View style={styles.postsContainer}>
+      <Text style={styles.sectionTitle}>Publicaciones</Text>
+      {posts.length > 0 ? (
         <FlatList
           data={posts}
           keyExtractor={item => item.id}
           numColumns={3}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={{ flex: 1 / 3, aspectRatio: 1, margin: 1 }}
+              style={styles.gridItem}
               onPress={() => setSelectedPost(item)}
             >
-              <Image source={{ uri: item.image }} style={{ width: '100%', height: '100%' }} />
+              {item.image ? (
+                <Image source={{ uri: item.image }} style={styles.gridImage} />
+              ) : (
+                <View style={[styles.gridImage, styles.gridPlaceholder]}>
+                  <Ionicons name="image-outline" size={24} color="#555" />
+                </View>
+              )}
             </TouchableOpacity>
           )}
           scrollEnabled={false}
         />
-      </View>
+      ) : (
+        <Text style={styles.noDataText}>Este usuario no ha publicado nada todavía.</Text>
+      )}
+    </View>
 
-      {selectedPost && (
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={!!selectedPost}
-          onRequestClose={() => setSelectedPost(null)}
+    {selectedPost && (
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={!!selectedPost}
+        onRequestClose={() => setSelectedPost(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.detailOverlay}
         >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.97)' }}
-          >
-            <ScrollView contentContainerStyle={{ padding: 20 }}>
-              <TouchableOpacity onPress={() => setSelectedPost(null)} style={{ position: 'absolute', top: 30, right: 20 }}>
-                <Ionicons name="close-circle" size={32} color="#aaa" />
-              </TouchableOpacity>
-              <Image source={{ uri: selectedPost.image }} style={{ width: '100%', aspectRatio: 1, borderRadius: 10 }} />
-              <Text style={{ color: '#bbb' }}>{selectedPost.likeCount} Me gusta</Text>
+          <ScrollView style={styles.detailScroll}>
+            <TouchableOpacity onPress={() => setSelectedPost(null)} style={styles.closeButton}>
+              <Ionicons name="close-circle" size={32} color="#aaa" />
+            </TouchableOpacity>
 
-              {/* Comentarios */}
-              <View style={{ marginTop: 20 }}>
+            {/* Author Info */}
+            <View style={styles.detailAuthor}>
+              <Image
+                source={userData?.photo ? { uri: userData.photo } : defaultImage}
+                style={styles.detailAuthorImage}
+              />
+              <Text style={styles.detailAuthorName}>{userData?.name || 'Usuario'}</Text>
+            </View>
+            
+            {/* Image */}
+            {selectedPost.image && (
+              <Image
+                source={{ uri: selectedPost.image }}
+                style={styles.detailImage}
+              />
+            )}
+            
+            {/* Content */}
+            <View style={styles.detailContent}>
+              <Text style={styles.detailCaption}>{selectedPost.content}</Text>
+              
+              <Text style={styles.detailContent}>{selectedPost.likeCount || 0} Me gusta</Text>
+
+              {/* Comments */}
+              <View style={{ width: '100%', marginTop: 16 }}>
                 {loadingComments ? (
                   <ActivityIndicator color="#bb86fc" />
                 ) : comments.length > 0 ? (
                   comments.map((comment) => (
-                    <View key={comment.id} style={{ flexDirection: 'row', backgroundColor: '#bb86fc', borderRadius: 10, padding: 10, marginBottom: 8 }}>
-                      <Image
-                        source={comment.user?.image ? { uri: comment.user.image } : defaultImage}
-                        style={{ width: 32, height: 32, borderRadius: 16, marginRight: 8 }}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: 'bold', color: '#333' }}>{comment.user?.name || 'Usuario'}</Text>
-                        <Text style={{ color: '#333' }}>{comment.text}</Text>
-                      </View>
+                    <View key={comment.id} style={styles.commentCard}>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          if (comment.user?.id !== uid) { // No navegar si es el mismo perfil
+                            setSelectedPost(null);
+                            router.push(`/extra/perfil?uid=${comment.user?.id}`);
+                          }
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center' }}
+                      >
+                        <Image
+                          source={comment.user?.image ? 
+                            (typeof comment.user.image === 'string' ? 
+                              { uri: comment.user.image } : comment.user.image) : 
+                            defaultImage}
+                          style={styles.commentUserImage}
+                        />
+                        <Text style={styles.commentUserName}>{comment.user?.name || 'Usuario'}</Text>
+                      </TouchableOpacity>
                       {comment.user?.id === currentUserId && (
                         <TouchableOpacity
                           onPress={() => deleteComment(comment.id)}
@@ -220,28 +283,29 @@ export default function AmigoProfileScreen() {
                     </View>
                   ))
                 ) : (
-                  <Text style={{ color: '#aaa' }}>No hay comentarios aún.</Text>
+                  <Text style={styles.noDataText}>No hay comentarios aún.</Text>
                 )}
               </View>
-            </ScrollView>
-
-            {/* Input de comentario */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10, backgroundColor: '#121212', borderTopWidth: 1, borderTopColor: '#333' }}>
-              <TextInput
-                style={{ flex: 1, backgroundColor: '#2a2a2a', color: '#fff', borderRadius: 20, paddingHorizontal: 15, paddingVertical: Platform.OS === 'ios' ? 12 : 8 }}
-                placeholder="Añadir un comentario..."
-                placeholderTextColor="#888"
-                value={newComment}
-                onChangeText={setNewComment}
-              />
-              <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
-                <Ionicons name="send" size={24} color={newComment.trim() ? '#bb86fc' : '#888'} />
-              </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
-        </Modal>
-      )}
-    </ScrollView>
+          </ScrollView>
+
+          {/* Comment Input */}
+          <View style={styles.commentInputRow}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Añadir un comentario..."
+              placeholderTextColor="#888"
+              value={newComment}
+              onChangeText={setNewComment}
+            />
+            <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
+              <Ionicons name="send" size={24} color={newComment.trim() ? '#bb86fc' : '#888'} />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    )}
+  </ScrollView>
   );
 }
 

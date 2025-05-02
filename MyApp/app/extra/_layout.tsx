@@ -1,33 +1,34 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
+import React from 'react';
 import { TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 export default function ExtraLayout() {
-  const router = useRouter();
+  const router = useRouter(); 
 
   return (
     <Stack
       screenOptions={{
-        headerShown: true, // Asegura que el header sea visible
         headerStyle: {
-          backgroundColor: '#1e1e1e', // Color de fondo oscuro para el header
+          backgroundColor: '#1e1e1e', // Fondo oscuro para el header
         },
-        headerTintColor: '#fff', // Color blanco para el título y el botón de retroceso
+        headerTintColor: '#fff', // Texto blanco en el header
         headerTitleStyle: {
-          color: '#fff', // Asegura que el título sea blanco
+          fontWeight: 'bold',
         },
-        // Define el botón izquierdo (retroceso)
-        headerLeft: () => (
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{ marginLeft: 15, padding: 5 }} // Añade padding para facilitar el toque
-          >
+        headerLeft: () => ( // Tu botón personalizado ya oculta el título
+          <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 15 }}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
         ),
       }}
     >
-      {/* Opcional: Define títulos específicos para cada pantalla si lo deseas */}
+      {/* Asegúrate de que todas las pantallas bajo 'extra' estén definidas aquí */}
+      <Stack.Screen name="messages" options={{ title: 'Mensajes' }} />
+      <Stack.Screen name="notifications" options={{ title: 'Notificaciones' }} />
+      <Stack.Screen name="perfil" options={{ title: 'Perfil de Amigo' }} />
+      <Stack.Screen name="chat" options={{ title: 'Chat' }} /> 
       <Stack.Screen name="crearpubli" options={{ title: 'Crear Publicación' }} />
       <Stack.Screen name="edit-profile" options={{ title: 'Editar Perfil' }} />
       <Stack.Screen name="question-detail" options={{ title: 'Detalle Pregunta' }} />

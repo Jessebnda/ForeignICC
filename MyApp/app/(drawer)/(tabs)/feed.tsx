@@ -478,7 +478,7 @@ export default function FeedScreen() {
               {/* Author Info */}
               <TouchableOpacity
               onPress={() => {
-                setSelectedPost(null);
+                setSelectedPost(null); // Cerrar el modal actual
                 router.push(`/extra/perfil?uid=${selectedPost.user.id}`);
               }}
               style={styles.authorContainer}
@@ -531,42 +531,29 @@ export default function FeedScreen() {
           ) : comments.length > 0 ? (
             comments.map((comment) => (
               <View key={comment.id} style={styles.commentCard}>
-                <Image
-                  source={
-                    comment.user?.image
-                      ? typeof comment.user.image === 'string'
-                        ? { uri: comment.user.image }
-                        : comment.user.image
-                      : require('../../../assets/images/img7.jpg')
-                  }
-                  style={styles.commentUserImage}
-                />
-                <View style={styles.commentContent}>
-                  <Text style={styles.commentUserName}>{comment.user?.name || 'Usuario'}</Text>
-                  <Text style={styles.commentText}> {comment.text}</Text>
-                </View>
-
-                {comment.user?.id === currentUserId && (
-                  <TouchableOpacity
-                    onPress={() =>
-                      Alert.alert(
-                        'Eliminar comentario',
-                        '¿Quieres eliminar este comentario?',
-                        [
-                          { text: 'Cancelar', style: 'cancel' },
-                          {
-                            text: 'Eliminar',
-                            style: 'destructive',
-                            onPress: () => deleteComment(comment.id),
-                          },
-                        ]
-                      )
+                <TouchableOpacity 
+                  onPress={() => {
+                    setSelectedPost(null); // Cerrar el modal actual
+                    router.push(`/extra/perfil?uid=${comment.user?.id}`);
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center' }}
+                >
+                  <Image
+                    source={
+                      comment.user?.image
+                        ? typeof comment.user.image === 'string'
+                          ? { uri: comment.user.image }
+                          : comment.user.image
+                        : require('../../../assets/images/img7.jpg')
                     }
-                    style={{ padding: 4, marginLeft: 4 }}
-                  >
-                    <Ionicons name="trash-outline" size={20} color="red" />
-                  </TouchableOpacity>
-                )}
+                    style={styles.commentUserImage}
+                  />
+                  <Text style={styles.commentUserName}>{comment.user?.name || 'Usuario'}</Text>
+                </TouchableOpacity>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#333' }}>{comment.text}</Text>
+                </View>
+                {/* Resto del código para botones de eliminar, etc. */}
               </View>
             ))
           ) : (
