@@ -297,7 +297,7 @@ export default function MapScreen() {
   type Friend = { id: string; name: string; };
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
-  const [raiteTimeoutId, setRaiteTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [raiteTimeoutId, setRaiteTimeoutId] = useState<number | null>(null);
 
 
   const sendRaiteRequestRealtime = async () => {
