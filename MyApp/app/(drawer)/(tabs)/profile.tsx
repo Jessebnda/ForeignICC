@@ -36,6 +36,7 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '../../../firebase';
 import { useRouter } from 'expo-router';
+import MaxWidthContainer from '../../../components/MaxWidthContainer';
 
 // Default image asset
 const defaultUserImage = require('../../../assets/images/img7.jpg');
@@ -293,82 +294,84 @@ export default function ProfileScreen() {
 
     // Use ScrollView as the main container
     return (
-        <ScrollView // <-- Use ScrollView here
-            style={styles.container}
-            refreshControl={
-                <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    colors={["#bb86fc"]}
-                    tintColor={"#bb86fc"}
-                />
-            }
-        >
-            {/* Profile Header */}
-            <View style={styles.profileHeader}>
-                <Image
-                    source={userProfile?.photo ? { uri: userProfile.photo } : defaultUserImage}
-                    style={styles.profileImage}
-                />
-                <Text style={styles.profileName}>{userProfile?.name || 'Usuario'}</Text>
-                <Text style={styles.profileInfo}>{userProfile?.university || 'Universidad no especificada'}</Text>
-                <TouchableOpacity style={styles.editButton} onPress={navigateToEditProfile}>
-                    <Text style={styles.editButtonText}>Editar Perfil</Text>
-                </TouchableOpacity>
-            </View>
+        <View style={styles.container}>
+            <MaxWidthContainer>
+                <ScrollView // <-- Use ScrollView here
+                    style={styles.container}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={["#bb86fc"]}
+                            tintColor={"#bb86fc"}
+                        />
+                    }
+                >
+                    {/* Profile Header */}
+                    <View style={styles.profileHeader}>
+                        <Image
+                            source={userProfile?.photo ? { uri: userProfile.photo } : defaultUserImage}
+                            style={styles.profileImage}
+                        />
+                        <Text style={styles.profileName}>{userProfile?.name || 'Usuario'}</Text>
+                        <Text style={styles.profileInfo}>{userProfile?.university || 'Universidad no especificada'}</Text>
+                        <TouchableOpacity style={styles.editButton} onPress={navigateToEditProfile}>
+                            <Text style={styles.editButtonText}>Editar Perfil</Text>
+                        </TouchableOpacity>
+                    </View>
 
-            {/* Interests */}
-            <View style={styles.interestsContainer}>
-                <Text style={styles.sectionTitle}>Intereses</Text>
-                <View style={styles.interestsList}>
-                    {userProfile?.interests && userProfile.interests.length > 0 ? (
-                        userProfile.interests.map((interest: string) => (
-                            <View key={interest} style={styles.interestChip}>
-                                <Text style={styles.interestText}>{interest}</Text>
-                            </View>
-                        ))
-                    ) : (
-                        <Text style={styles.noDataText}>No hay intereses definidos.</Text>
-                    )}
-                </View>
-            </View>
+                    {/* Interests */}
+                    <View style={styles.interestsContainer}>
+                        <Text style={styles.sectionTitle}>Intereses</Text>
+                        <View style={styles.interestsList}>
+                            {userProfile?.interests && userProfile.interests.length > 0 ? (
+                                userProfile.interests.map((interest: string) => (
+                                    <View key={interest} style={styles.interestChip}>
+                                        <Text style={styles.interestText}>{interest}</Text>
+                                    </View>
+                                ))
+                            ) : (
+                                <Text style={styles.noDataText}>No hay intereses definidos.</Text>
+                            )}
+                        </View>
+                    </View>
 
-            {/* Posts Grid */}
-            <View style={styles.postsContainer}>
-                <Text style={styles.sectionTitle}>Mis Publicaciones</Text>
-                {loadingPosts ? (
-                    <ActivityIndicator size="small" color="#bb86fc" style={{ marginTop: 20 }} />
-                ) : (
-                    <>
-                        {posts.length > 0 ? (
-                            <FlatList
-                                data={posts}
-                                keyExtractor={item => item.id}
-                                numColumns={3}
-                                renderItem={({ item }) => (
-                                    <TouchableOpacity
-                                        style={styles.gridItem}
-                                        onPress={() => handlePostPress(item)}
-                                    >
-                                        {item.imageUrl ? (
-                                            <Image source={{ uri: item.imageUrl }} style={styles.gridImage} />
-                                        ) : (
-                                            <View style={[styles.gridImage, styles.gridPlaceholder]}>
-                                                <Ionicons name="image-outline" size={24} color="#555" />
-                                            </View>
-                                        )}
-                                    </TouchableOpacity>
-                                )}
-                                scrollEnabled={false} // Important: Disable FlatList scrolling inside ScrollView
-                            />
+                    {/* Posts Grid */}
+                    <View style={styles.postsContainer}>
+                        <Text style={styles.sectionTitle}>Mis Publicaciones</Text>
+                        {loadingPosts ? (
+                            <ActivityIndicator size="small" color="#bb86fc" style={{ marginTop: 20 }} />
                         ) : (
-                            <Text style={styles.noDataText}>No has publicado nada todavía.</Text>
+                            <>
+                                {posts.length > 0 ? (
+                                    <FlatList
+                                        data={posts}
+                                        keyExtractor={item => item.id}
+                                        numColumns={3}
+                                        renderItem={({ item }) => (
+                                            <TouchableOpacity
+                                                style={styles.gridItem}
+                                                onPress={() => handlePostPress(item)}
+                                            >
+                                                {item.imageUrl ? (
+                                                    <Image source={{ uri: item.imageUrl }} style={styles.gridImage} />
+                                                ) : (
+                                                    <View style={[styles.gridImage, styles.gridPlaceholder]}>
+                                                        <Ionicons name="image-outline" size={24} color="#555" />
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
+                                        )}
+                                        scrollEnabled={false} // Important: Disable FlatList scrolling inside ScrollView
+                                    />
+                                ) : (
+                                    <Text style={styles.noDataText}>No has publicado nada todavía.</Text>
+                                )}
+                            </>
                         )}
-                    </>
-                )}
-            </View>
+                    </View>
 
-            {/* Post Detail Modal */}
+                    {/* Post Detail Modal */}
                   {selectedPost && (
                     <Modal
                       animationType="slide"
@@ -487,7 +490,9 @@ export default function ProfileScreen() {
                     </Modal>
                   )}    
             
-        </ScrollView> // <-- Close ScrollView here
+        </ScrollView> 
+            </MaxWidthContainer>
+        </View>
     );
 }
 

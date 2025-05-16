@@ -13,6 +13,7 @@ import { Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons } from '@
 import { collection, getDocs } from 'firebase/firestore';
 import { firestore } from '../../../firebase';
 import { useNavigation } from 'expo-router'; // <--- AÑADIDO
+import MaxWidthContainer from '../../../components/MaxWidthContainer';
 
 export default function App() {
   const navigation = useNavigation(); // <--- AÑADIDO
@@ -151,25 +152,27 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {sections.map((section) => (
-          <View key={section.id} style={styles.sectionContainer}>
-            <Text style={styles.subtitle}>Gestión de {section.title}</Text>
-            <View style={styles.card}>
-              {section.icon}
-              {section.loading ? (
-                <ActivityIndicator size="large" color="#b388ff" style={styles.loader} />
-              ) : (
-                <Text style={styles.countNumber}>{section.count}</Text>
-              )}
-              <Text style={styles.countLabel}>Total de {section.title}</Text>
+      <MaxWidthContainer>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {sections.map((section) => (
+            <View key={section.id} style={styles.sectionContainer}>
+              <Text style={styles.subtitle}>Gestión de {section.title}</Text>
+              <View style={styles.card}>
+                {section.icon}
+                {section.loading ? (
+                  <ActivityIndicator size="large" color="#b388ff" style={styles.loader} />
+                ) : (
+                  <Text style={styles.countNumber}>{section.count}</Text>
+                )}
+                <Text style={styles.countLabel}>Total de {section.title}</Text>
+              </View>
+              <TouchableOpacity style={styles.button} onPress={() => handleNavigation(section.path)}>
+                <Text style={styles.buttonText}>{section.action}</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.button} onPress={() => handleNavigation(section.path)}>
-              <Text style={styles.buttonText}>{section.action}</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </ScrollView>
+      </MaxWidthContainer>
     </SafeAreaView>
   );
 }

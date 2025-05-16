@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { fetchChatbotAnswer } from '../services/api_service';
 import type { ChatMessage } from '../models/chat_message';
+import MaxWidthContainer from '../../components/MaxWidthContainer';
 
 const CHATBOT_URL = 'https://magicloops.dev/api/loop/624ec5d5-053b-4ad4-a4fe-0b00bddc2a50/run';
 
@@ -37,28 +38,30 @@ export default function ChatbotScreen() {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 100} // Aumenta el offset según tu dispositivo
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 100}
     >
-      <FlatList
-        data={messages}
-        keyExtractor={(_, i) => `msg-${i}`}
-        renderItem={renderItem}
-        style={styles.messageList}
-        contentContainerStyle={{ padding: 8 }}
-      />
-      {loading && <ActivityIndicator style={{ margin: 8 }} color="#bb86fc" />}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="Escribe tu mensaje..."
-          placeholderTextColor="#888"
+      <MaxWidthContainer style={{maxWidth: 768}}>
+        <FlatList
+          data={messages}
+          keyExtractor={(_, i) => `msg-${i}`}
+          renderItem={renderItem}
+          style={styles.messageList}
+          contentContainerStyle={{ padding: 8 }}
         />
-        <TouchableOpacity style={styles.sendButton} onPress={sendMessage} disabled={loading}>
-          <Text style={styles.sendButtonText}>Enviar</Text>
-        </TouchableOpacity>
-      </View>
+        {loading && <ActivityIndicator style={{ margin: 8 }} color="#bb86fc" />}
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Escribe tu mensaje..."
+            placeholderTextColor="#888"
+          />
+          <TouchableOpacity style={styles.sendButton} onPress={sendMessage} disabled={loading}>
+            <Text style={styles.sendButtonText}>Enviar</Text>
+          </TouchableOpacity>
+        </View>
+      </MaxWidthContainer>
     </KeyboardAvoidingView>
   );
 }

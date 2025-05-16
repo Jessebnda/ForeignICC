@@ -15,6 +15,7 @@ import { collection, getDocs, doc, updateDoc, arrayUnion, arrayRemove } from 'fi
 import { getAuth } from 'firebase/auth';
 import { firestore } from '../../firebase';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import MaxWidthContainer from '../../components/MaxWidthContainer';
 
 type UserData = {
   id: string;
@@ -275,26 +276,28 @@ export default function AmigosScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        <Ionicons name="people" size={24} color="#bb86fc" /> Buscar amigos
-      </Text>
-      
-      <FlatList
-        data={users}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={onRefresh}
-            colors={['#bb86fc']}
-            tintColor="#bb86fc"
-          />
-        }
-        ListEmptyComponent={EmptyListComponent}
-        showsVerticalScrollIndicator={false}
-      />
+      <MaxWidthContainer>
+        <Text style={styles.title}>
+          <Ionicons name="people" size={24} color="#bb86fc" /> Buscar amigos
+        </Text>
+        
+        <FlatList
+          data={users}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              colors={['#bb86fc']}
+              tintColor="#bb86fc"
+            />
+          }
+          ListEmptyComponent={EmptyListComponent}
+          showsVerticalScrollIndicator={false}
+        />
+      </MaxWidthContainer>
     </View>
   );
 }

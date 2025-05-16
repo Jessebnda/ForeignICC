@@ -19,6 +19,7 @@ import { doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { firestore } from '../../../firebase'; // Ya no necesitamos database
 import * as Haptics from 'expo-haptics';
 import { TextInput } from 'react-native-gesture-handler';
+import MaxWidthContainer from '../../../components/MaxWidthContainer';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -132,113 +133,111 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar backgroundColor="#1e1e1e" barStyle="light-content" />
-      
-      {/* Header estilo Extra */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Configuración</Text>
-        <View style={{width: 40}} /> {/* Espacio para equilibrar el header */}
-      </View>
-      
-      <ScrollView 
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Privacidad</Text>
-          
-          {/* Eliminada la opción de ubicación */}
-          
-          <View style={styles.settingItem}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="notifications" size={22} color="#bb86fc" />
-              <Text style={styles.settingText}>Notificaciones</Text>
-            </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={toggleNotifications}
-              trackColor={{ false: "#555", true: "#bb86fc" }}
-              thumbColor={notificationsEnabled ? "#fff" : "#f4f3f4"}
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cuenta</Text>
-          
-          <TouchableOpacity 
-            style={styles.dangerButton} 
-            onPress={confirmDeleteAccount}
+      <MaxWidthContainer>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
           >
-            <Ionicons name="trash-outline" size={22} color="#fff" />
-            <Text style={styles.dangerButtonText}>Eliminar cuenta</Text>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.warningText}>
-            Esta acción eliminará permanentemente tu cuenta y todos tus datos.
-          </Text>
+          <Text style={styles.headerTitle}>Configuración</Text>
+          <View style={{width: 40}} /> {/* Espacio para equilibrar el header */}
         </View>
-
-        {/* Modal sigue igual... */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={deleteModalVisible}
-          onRequestClose={() => setDeleteModalVisible(false)}
+        
+        <ScrollView 
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <Text style={styles.modalTitle}>Eliminar cuenta</Text>
-              <Text style={styles.modalText}>
-                Esta acción no se puede deshacer. Todos tus datos, publicaciones y conexiones serán eliminados permanentemente.
-              </Text>
-              
-              <Text style={styles.inputLabel}>Ingresa tu contraseña para confirmar:</Text>
-              <TextInput
-                style={styles.passwordInput}
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Contraseña"
-                placeholderTextColor="#888"
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Privacidad</Text>
+            
+            {/* Eliminada la opción de ubicación */}
+            
+            <View style={styles.settingItem}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="notifications" size={22} color="#bb86fc" />
+                <Text style={styles.settingText}>Notificaciones</Text>
+              </View>
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={toggleNotifications}
+                trackColor={{ false: "#555", true: "#bb86fc" }}
+                thumbColor={notificationsEnabled ? "#fff" : "#f4f3f4"}
               />
-              
-              {deleteError ? <Text style={styles.errorText}>{deleteError}</Text> : null}
-              
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={styles.cancelButton} 
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setDeleteModalVisible(false);
-                    setPassword('');
-                    setDeleteError('');
-                  }}
-                >
-                  <Text style={styles.cancelButtonText}>Cancelar</Text>
-                </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Cuenta</Text>
+            
+            <TouchableOpacity 
+              style={styles.dangerButton} 
+              onPress={confirmDeleteAccount}
+            >
+              <Ionicons name="trash-outline" size={22} color="#fff" />
+              <Text style={styles.dangerButtonText}>Eliminar cuenta</Text>
+            </TouchableOpacity>
+            <Text style={styles.warningText}>
+              Esta acción eliminará permanentemente tu cuenta y todos tus datos.
+            </Text>
+          </View>
+
+          {/* Modal de eliminación */}
+          <Modal
+            visible={deleteModalVisible}
+            transparent
+            animationType="fade"
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContainer}>
+                <Text style={styles.modalTitle}>Eliminar cuenta</Text>
+                <Text style={styles.modalText}>
+                  Esta acción no se puede deshacer. Todos tus datos, publicaciones y conexiones serán eliminados permanentemente.
+                </Text>
                 
-                <TouchableOpacity 
-                  style={[styles.confirmDeleteButton, !password && styles.disabledButton]} 
-                  onPress={handleDeleteAccount}
-                  disabled={!password || deleteLoading}
-                >
-                  {deleteLoading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.confirmDeleteText}>Eliminar</Text>
-                  )}
-                </TouchableOpacity>
+                <Text style={styles.inputLabel}>Ingresa tu contraseña para confirmar:</Text>
+                <TextInput
+                  style={styles.passwordInput}
+                  secureTextEntry
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Contraseña"
+                  placeholderTextColor="#888"
+                />
+                
+                {deleteError ? <Text style={styles.errorText}>{deleteError}</Text> : null}
+                
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity 
+                    style={styles.cancelButton} 
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setDeleteModalVisible(false);
+                      setPassword('');
+                      setDeleteError('');
+                    }}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancelar</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.confirmDeleteButton, !password && styles.disabledButton]} 
+                    onPress={handleDeleteAccount}
+                    disabled={!password || deleteLoading}
+                  >
+                    {deleteLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.confirmDeleteText}>Eliminar</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
-      </ScrollView>
+          </Modal>
+        </ScrollView>
+      </MaxWidthContainer>
     </SafeAreaView>
   );
 }

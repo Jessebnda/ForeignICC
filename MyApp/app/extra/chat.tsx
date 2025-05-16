@@ -11,6 +11,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { firestore, database } from '../../firebase';              
 import { useChatMessages, sendMessage, generateChatId, RealtimeChatMessage } from '../services/chatService';
 import { ref, update, get } from 'firebase/database'; // Asegúrate de importar update y get
+import MaxWidthContainer from '../../components/MaxWidthContainer';
 
 const defaultUserImage = require('../../assets/images/img7.jpg');
 
@@ -123,47 +124,48 @@ export default function ChatScreen() {
   }, [chatId, currentUser, friendId]);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
+    <KeyboardAvoidingView 
+      style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 70}
     >
-      {/* header y FlatList… */}
-      <View style={styles.profileHeader}>
-        <Image
-          source={photoUri ? { uri: photoUri } : defaultUserImage}
-          style={styles.profileImage}
+      <MaxWidthContainer style={{maxWidth: 768}}>
+        {/* header y FlatList… */}
+        <View style={styles.profileHeader}>
+          <Image
+            source={photoUri ? { uri: photoUri } : defaultUserImage}
+            style={styles.profileImage}
+          />
+          <Text style={styles.profileName}>{friendName || 'Chat'}</Text>
+        </View>
+        <FlatList
+          data={uniqueMessages}                // usa la lista deduplicada
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
         />
-        <Text style={styles.profileName}>{friendName || 'Chat'}</Text>
-      </View>
-      <FlatList
-        data={uniqueMessages}                // usa la lista deduplicada
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-      />
 
-      {/* Footer: elevamos 2px la línea de separación */}
-      <View
-        style={[
-          styles.inputRow,
-          {
-            paddingBottom: (insets.bottom || 0) + 2, // mantén algo de espacio al fondo
-          
-          }
-        ]}
-      >
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="Escribe un mensaje..."
-          placeholderTextColor="#888"
-        />
-        <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
-          <Text style={styles.sendText}>Enviar</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Footer: elevamos 2px la línea de separación */}
+        <View
+          style={[
+            styles.inputRow,
+            {
+              paddingBottom: (insets.bottom || 0) + 2, // mantén algo de espacio al fondo
+            
+            }
+          ]}
+        >
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Escribe un mensaje..."
+            placeholderTextColor="#888"
+          />
+          <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
+            <Text style={styles.sendText}>Enviar</Text>
+          </TouchableOpacity>
+        </View>
+      </MaxWidthContainer>
     </KeyboardAvoidingView>
   );
 }

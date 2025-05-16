@@ -9,7 +9,8 @@ import {
   ActivityIndicator,
   Modal,
   Text,
-  Alert
+  Alert,
+  SafeAreaView
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { collection, getDocs, orderBy, query, deleteField, doc, addDoc, serverTimestamp, updateDoc, getDoc, deleteDoc } from 'firebase/firestore';
@@ -25,7 +26,7 @@ import { ScrollView } from 'react-native';
 import { RefreshControl } from 'react-native';
 import EditItem from '../(adminTabs)/editItem';
 import { createNotification } from '../../../services/notificationService';
-
+import MaxWidthContainer from '../../../components/MaxWidthContainer';
 
 type Post = {
   id: string;
@@ -439,155 +440,157 @@ export default function FeedScreen() {
   
 
   return (
-    <View style={{ flex: 1 }}>
-      <FlatList
-        data={universityPosts}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.postRow}
-        renderItem={renderPost}
-        ListHeaderComponent={
-          <WeeklyEventsSlider friendPosts={friendPosts} onPressItem={goToPostDetail} />
-        }
-        style={styles.container}
-        contentContainerStyle={styles.contentContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      />
+    <SafeAreaView style={styles.container}>
+      <MaxWidthContainer>
+        <FlatList
+          data={universityPosts}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          columnWrapperStyle={styles.postRow}
+          renderItem={renderPost}
+          ListHeaderComponent={
+            <WeeklyEventsSlider friendPosts={friendPosts} onPressItem={goToPostDetail} />
+          }
+          style={styles.container}
+          contentContainerStyle={styles.contentContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        />
   
-      {/* Post Detail Modal */}
-      {selectedPost && (
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={!!selectedPost}
-          onRequestClose={closeModal}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.detailOverlay}
+        {/* Post Detail Modal */}
+        {selectedPost && (
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={!!selectedPost}
+            onRequestClose={closeModal}
           >
-            <ScrollView style={styles.detailScroll}
-            contentContainerStyle={{ paddingBottom: 80 }}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={styles.detailOverlay}
             >
-              <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
-                <Ionicons name="close-circle" size={32} color="#aaa" />
-              </TouchableOpacity>
-  
-              {/* Author Info */}
-              <TouchableOpacity
-              onPress={() => {
-                setSelectedPost(null); // Cerrar el modal actual
-                router.push(`/extra/perfil?uid=${selectedPost.user.id}`);
-              }}
-              style={styles.authorContainer}
-            >
-              <Image
-                source={
-                  selectedPost.user.image || require('../../../assets/images/img7.jpg')
-                }
-                style={styles.detailAuthorImage}
-              />
-              <Text style={styles.detailAuthorName}>{selectedPost.user.name}</Text>
-            </TouchableOpacity>
-  
-              {/* Image */}
-              {selectedPost.image && (
-                <Image
-                  source={{ uri: selectedPost.image }}
-                  style={styles.detailImage}
-                />
-              )}
-
-              {selectedPost?.user.id === currentUserId && (
-              <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 8 }}>
-            <TouchableOpacity onPress={() => deletePost(selectedPost.id)}>
-              <Ionicons name="trash-outline" size={24} color="red" />
-            </TouchableOpacity>
-            </View>
-          )}
-  
-              {/* Content/Caption */}
-              <View style={styles.detailContent}>
-                <Text style={styles.detailCaption}>{selectedPost.content}</Text>
-  
-                {/* Like Button */}
-                <View style={{ width: '100%', marginTop: 16, alignItems: 'flex-start' }}>
-                <TouchableOpacity onPress={toggleLike} style={styles.likeButton}>
-                    <Ionicons
-                      name={liked ? "heart" : "heart-outline"}
-                      size={28}
-                      color={liked ? "#e91e63" : "#fff"}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-            <Text style={styles.actionText}>{selectedPost.likeCount} Me gusta</Text>
-            
-          <View style={{ width: '100%', marginTop: 16 }}>
-          {loadingComments ? (
-            <ActivityIndicator color="#bb86fc" />
-          ) : comments.length > 0 ? (
-            comments.map((comment) => (
-              <View key={comment.id} style={styles.commentCard}>
-                <TouchableOpacity 
-                  onPress={() => {
-                    setSelectedPost(null); // Cerrar el modal actual
-                    router.push(`/extra/perfil?uid=${comment.user?.id}`);
-                  }}
-                  style={{ flexDirection: 'row', alignItems: 'center' }}
-                >
-                  <Image
-                    source={
-                      comment.user?.image
-                        ? typeof comment.user.image === 'string'
-                          ? { uri: comment.user.image }
-                          : comment.user.image
-                        : require('../../../assets/images/img7.jpg')
-                    }
-                    style={styles.commentUserImage}
-                  />
-                  <Text style={styles.commentUserName}>{comment.user?.name || 'Usuario'}</Text>
+              <ScrollView style={styles.detailScroll}
+              contentContainerStyle={{ paddingBottom: 80 }}
+              >
+                <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+                  <Ionicons name="close-circle" size={32} color="#aaa" />
                 </TouchableOpacity>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: '#333' }}>{comment.text}</Text>
-                </View>
-                {/* Resto del código para botones de eliminar, etc. */}
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noDataText}>No hay comentarios aún.</Text>
-          )}
-        </View>
-        </View>
-        </ScrollView>
   
-            {/* Comment Input */}
-            <View style={styles.commentInputRow}>
-              <TextInput
-                style={styles.commentInput}
-                placeholder="Añadir un comentario..."
-                placeholderTextColor="#888"
-                value={newComment}
-                onChangeText={setNewComment}
-              />
-              <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
-                <Ionicons name="send" size={24} color={newComment.trim() ? "#bb86fc" : "#888"} />
+                {/* Author Info */}
+                <TouchableOpacity
+                onPress={() => {
+                  setSelectedPost(null); // Cerrar el modal actual
+                  router.push(`/extra/perfil?uid=${selectedPost.user.id}`);
+                }}
+                style={styles.authorContainer}
+              >
+                <Image
+                  source={
+                    selectedPost.user.image || require('../../../assets/images/img7.jpg')
+                  }
+                  style={styles.detailAuthorImage}
+                />
+                <Text style={styles.detailAuthorName}>{selectedPost.user.name}</Text>
               </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
-        
-        )}
   
-      {/* crear post bton */}
-      {!isKeyboardVisible && (
-        <TouchableOpacity style={styles.fab} onPress={goToCreatePost}>
-          <Text style={styles.fabText}>＋</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+                {/* Image */}
+                {selectedPost.image && (
+                  <Image
+                    source={{ uri: selectedPost.image }}
+                    style={styles.detailImage}
+                  />
+                )}
+
+                {selectedPost?.user.id === currentUserId && (
+                <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 8 }}>
+              <TouchableOpacity onPress={() => deletePost(selectedPost.id)}>
+                <Ionicons name="trash-outline" size={24} color="red" />
+              </TouchableOpacity>
+              </View>
+            )}
+  
+                {/* Content/Caption */}
+                <View style={styles.detailContent}>
+                  <Text style={styles.detailCaption}>{selectedPost.content}</Text>
+  
+                  {/* Like Button */}
+                  <View style={{ width: '100%', marginTop: 16, alignItems: 'flex-start' }}>
+                  <TouchableOpacity onPress={toggleLike} style={styles.likeButton}>
+                      <Ionicons
+                        name={liked ? "heart" : "heart-outline"}
+                        size={28}
+                        color={liked ? "#e91e63" : "#fff"}
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+              <Text style={styles.actionText}>{selectedPost.likeCount} Me gusta</Text>
+              
+            <View style={{ width: '100%', marginTop: 16 }}>
+            {loadingComments ? (
+              <ActivityIndicator color="#bb86fc" />
+            ) : comments.length > 0 ? (
+              comments.map((comment) => (
+                <View key={comment.id} style={styles.commentCard}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setSelectedPost(null); // Cerrar el modal actual
+                      router.push(`/extra/perfil?uid=${comment.user?.id}`);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center' }}
+                  >
+                    <Image
+                      source={
+                        comment.user?.image
+                          ? typeof comment.user.image === 'string'
+                            ? { uri: comment.user.image }
+                            : comment.user.image
+                          : require('../../../assets/images/img7.jpg')
+                      }
+                      style={styles.commentUserImage}
+                    />
+                    <Text style={styles.commentUserName}>{comment.user?.name || 'Usuario'}</Text>
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#333' }}>{comment.text}</Text>
+                  </View>
+                  {/* Resto del código para botones de eliminar, etc. */}
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noDataText}>No hay comentarios aún.</Text>
+            )}
+          </View>
+          </View>
+          </ScrollView>
+  
+              {/* Comment Input */}
+              <View style={styles.commentInputRow}>
+                <TextInput
+                  style={styles.commentInput}
+                  placeholder="Añadir un comentario..."
+                  placeholderTextColor="#888"
+                  value={newComment}
+                  onChangeText={setNewComment}
+                />
+                <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
+                  <Ionicons name="send" size={24} color={newComment.trim() ? "#bb86fc" : "#888"} />
+                </TouchableOpacity>
+              </View>
+            </KeyboardAvoidingView>
+          </Modal>
+          
+          )}
+  
+        {/* crear post bton */}
+        {!isKeyboardVisible && (
+          <TouchableOpacity style={styles.fab} onPress={goToCreatePost}>
+            <Text style={styles.fabText}>＋</Text>
+          </TouchableOpacity>
+        )}
+      </MaxWidthContainer>
+    </SafeAreaView>
     
   );
 }

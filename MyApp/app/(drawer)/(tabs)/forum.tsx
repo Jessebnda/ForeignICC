@@ -7,6 +7,7 @@ import { firestore } from '../../../firebase';
 import { getAuth } from 'firebase/auth';
 import { useUser } from '../../../context/UserContext';
 import { formatTimeAgo } from '../../../utils/formatters';
+import MaxWidthContainer from '../../../components/MaxWidthContainer';
 
 interface ForumUser {
   id: string;
@@ -130,76 +131,78 @@ export default function ForumScreen() {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={forumData}
-        keyExtractor={(item) => item.id}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity 
-            style={styles.card} 
-            onPress={() => goToQuestionDetail(item)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardHeader}>
-              <View style={styles.userInfo}>
-                <TouchableOpacity 
-                  style={{ flexDirection: 'row', alignItems: 'center' }}
-                  onPress={() => router.push(`/extra/perfil?uid=${item.user.id}`)}
-                >
-                  <Image 
-                    source={renderAvatar(item.user.photo)} 
-                    style={styles.avatar} 
-                  />
-                  <View>
-                    <Text style={styles.userName}>{item.user.name}</Text>
-                    <Text style={styles.timestamp}>{formatTimeAgo(item.timestamp)}</Text>
-                  </View>
+      <MaxWidthContainer>
+        <FlatList
+          data={forumData}
+          keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={styles.card} 
+              onPress={() => goToQuestionDetail(item)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardHeader}>
+                <View style={styles.userInfo}>
+                  <TouchableOpacity 
+                    style={{ flexDirection: 'row', alignItems: 'center' }}
+                    onPress={() => router.push(`/extra/perfil?uid=${item.user.id}`)}
+                  >
+                    <Image 
+                      source={renderAvatar(item.user.photo)} 
+                      style={styles.avatar} 
+                    />
+                    <View>
+                      <Text style={styles.userName}>{item.user.name}</Text>
+                      <Text style={styles.timestamp}>{formatTimeAgo(item.timestamp)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <Text style={styles.title}>{item.title}</Text>
+
+              <View style={styles.cardFooter}>
+                <View style={styles.stats}>
+                  <Ionicons name="chatbubble-outline" size={20} color="#bb86fc" />
+                  <Text style={styles.answerCount}>
+                    {item.answerCount || 0} {item.answerCount === 1 ? 'respuesta' : 'respuestas'}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.answerButton}>
+                  <Text style={styles.answerButtonText}>Responder</Text>
                 </TouchableOpacity>
               </View>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="chatbubbles-outline" size={64} color="#555" />
+              <Text style={styles.emptyText}>No hay preguntas en el foro</Text>
+              <Text style={styles.emptySubText}>¡Sé el primero en preguntar algo!</Text>
             </View>
-
-            <Text style={styles.title}>{item.title}</Text>
-
-            <View style={styles.cardFooter}>
-              <View style={styles.stats}>
-                <Ionicons name="chatbubble-outline" size={20} color="#bb86fc" />
-                <Text style={styles.answerCount}>
-                  {item.answerCount || 0} {item.answerCount === 1 ? 'respuesta' : 'respuestas'}
-                </Text>
-              </View>
-              <TouchableOpacity style={styles.answerButton}>
-                <Text style={styles.answerButtonText}>Responder</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={64} color="#555" />
-            <Text style={styles.emptyText}>No hay preguntas en el foro</Text>
-            <Text style={styles.emptySubText}>¡Sé el primero en preguntar algo!</Text>
-          </View>
-        }
-      />
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Escribe tu pregunta..."
-          placeholderTextColor="#888"
-          value={question}
-          onChangeText={setQuestion}
-          multiline
+          }
         />
-        <TouchableOpacity
-          style={[styles.sendButton, !question.trim() && styles.sendButtonDisabled]}
-          onPress={addQuestion}
-          disabled={!question.trim()}
-        >
-          <Ionicons name="send" size={20} color={question.trim() ? '#fff' : '#888'} />
-        </TouchableOpacity>
-      </View>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Escribe tu pregunta..."
+            placeholderTextColor="#888"
+            value={question}
+            onChangeText={setQuestion}
+            multiline
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, !question.trim() && styles.sendButtonDisabled]}
+            onPress={addQuestion}
+            disabled={!question.trim()}
+          >
+            <Ionicons name="send" size={20} color={question.trim() ? '#fff' : '#888'} />
+          </TouchableOpacity>
+        </View>
+      </MaxWidthContainer>
     </View>
   );
 }
