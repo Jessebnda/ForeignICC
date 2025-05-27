@@ -4,7 +4,7 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Activity
 import { fetchChatbotAnswer } from '../services/api_service';
 import type { ChatMessage } from '../models/chat_message';
 
-const CHATBOT_URL = 'https://magicloops.dev/api/loop/APIKEY/run';
+const CHATBOT_URL = 'https://magicloops.dev/api/loop/624ec5d5-053b-4ad4-a4fe-0b00bddc2a50/run';
 
 export default function ChatbotScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
