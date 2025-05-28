@@ -298,6 +298,8 @@ export default function ProfileScreen() {
             <MaxWidthContainer>
                 <ScrollView // <-- Use ScrollView here
                     style={styles.container}
+                              showsVerticalScrollIndicator={false}
+
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -348,6 +350,7 @@ export default function ProfileScreen() {
                                         data={posts}
                                         keyExtractor={item => item.id}
                                         numColumns={3}
+                                        showsVerticalScrollIndicator={false}
                                         renderItem={({ item }) => (
                                             <TouchableOpacity
                                                 style={styles.gridItem}
@@ -372,123 +375,122 @@ export default function ProfileScreen() {
                     </View>
 
                     {/* Post Detail Modal */}
-                  {selectedPost && (
-                    <Modal
-                      animationType="slide"
-                      transparent={true}
-                      visible={!!selectedPost}
-                      onRequestClose={closeModal}
-                    >
-
-                      <KeyboardAvoidingView
-                        behavior={Platform.OS === "ios" ? "padding" : "height"}
-                        style={styles.detailOverlay}
-                      >
-                        <ScrollView style={styles.detailScroll}>
-                          <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
-                            <Ionicons name="close-circle" size={32} color="#aaa" />
-                          </TouchableOpacity>
-              
-                          {/* Author Info */}
-                          <View style={styles.detailAuthor}>
-                            <Image
-                               source={selectedPost.userPhoto || require('../../../assets/images/img7.jpg')}
-                              style={styles.detailAuthorImage}
-                            />
-                            <Text style={styles.detailAuthorName}>{selectedPost.userName}</Text>
-                          </View>
-              
-                          {/* Image */}
-                          {selectedPost.imageUrl && (
-                            <Image
-                              source={{ uri: selectedPost.imageUrl }}
-                              style={styles.detailImage}
-                            />
-                          )}
-              
-                          {/* Content/Caption */}
-                          <View style={styles.detailContent}>
-                            <Text style={styles.detailCaption}>{selectedPost.content}</Text>
-
-                            {selectedPost && (
-                            <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 8 }}>
-                            <TouchableOpacity onPress={() => deletePost(selectedPost.id)}>
-                            <Ionicons name="trash-outline" size={24} color="red" />
-                            </TouchableOpacity>
-                            </View>
-                        )}
-              
-                     <Text style={styles.detailContent}>{selectedPost.likeCount} Me gusta</Text>
-                            
-              
-                        <View style={{ width: '100%', marginTop: 16 }}>
-                    {loadingComments ? (
-                    <ActivityIndicator color="#bb86fc" />
-                    ) : comments.length > 0 ? (
-                    comments.map((comment) => (
-                        <View key={comment.id} style={styles.commentCard}>
-                        <Image
-                            source={
-                            comment.user?.image
-                                ? typeof comment.user.image === 'string'
-                                ? { uri: comment.user.image }
-                                : comment.user.image
-                                : require('../../../assets/images/img7.jpg')
-                            }
-                            style={styles.commentUserImage}
-                        />
-                        <View style={styles.commentContent}>
-                            <Text style={styles.commentUserName}>{comment.user?.name || 'Usuario'}</Text>
-                            <Text style={styles.commentText}> {comment.text}</Text>
-                        </View>
-        
-                        {comment.user?.id === currentUserId && (
-                            <TouchableOpacity
-                            onPress={() =>
-                                Alert.alert(
-                                'Eliminar comentario',
-                                '¿Quieres eliminar este comentario?',
-                                [
-                                    { text: 'Cancelar', style: 'cancel' },
-                                    {
-                                    text: 'Eliminar',
-                                    style: 'destructive',
-                                    onPress: () => deleteComment(comment.id),
-                                    },
-                                ]
-                                )
-                            }
-                            style={{ padding: 4, marginLeft: 4 }}
+                    {selectedPost && (
+                        <Modal
+                            animationType="slide"
+                            transparent={true}
+                            visible={!!selectedPost}
+                            onRequestClose={closeModal}
+                        >
+                            <KeyboardAvoidingView
+                            behavior={Platform.OS === "ios" ? "padding" : "height"}
+                            style={styles.detailOverlay}
                             >
-                            <Ionicons name="trash-outline" size={20} color="red" />
-                            </TouchableOpacity>
+                            <ScrollView
+                                style={styles.detailScroll}
+                                contentContainerStyle={{ paddingBottom: 80 }}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                {/* Botón de cerrar */}
+                                <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+                                <Ionicons name="close-circle" size={32} color="#aaa" />
+                                </TouchableOpacity>
+
+                                {/* Autor */}
+                                <View style={styles.detailAuthor}>
+                                <Image
+                                    source={selectedPost.userPhoto || require('../../../assets/images/img7.jpg')}
+                                    style={styles.detailAuthorImage}
+                                />
+                                <Text style={styles.detailAuthorName}>{selectedPost.userName}</Text>
+                                </View>
+
+                                {/* Imagen */}
+                                {selectedPost.imageUrl && (
+                                <Image
+                                    source={{ uri: selectedPost.imageUrl }}
+                                    style={styles.detailImage}
+                                />
+                                )}
+
+                                {/* Contenido */}
+                                <View style={styles.detailContent}>
+                                <Text style={styles.detailCaption}>{selectedPost.content}</Text>
+
+                                {/* Eliminar */}
+                                <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 8 }}>
+                                    <TouchableOpacity onPress={() => deletePost(selectedPost.id)}>
+                                    <Ionicons name="trash-outline" size={24} color="red" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Likes */}
+                                <Text style={styles.detailContent}>{selectedPost.likeCount} Me gusta</Text>
+
+                                {/* Comentarios */}
+                                <View style={{ width: '100%', marginTop: 16 }}>
+                                    {loadingComments ? (
+                                    <ActivityIndicator color="#bb86fc" />
+                                    ) : comments.length > 0 ? (
+                                    comments.map((comment) => (
+                                        <View key={comment.id} style={styles.commentCard}>
+                                        <Image
+                                            source={
+                                            comment.user?.image
+                                                ? typeof comment.user.image === 'string'
+                                                ? { uri: comment.user.image }
+                                                : comment.user.image
+                                                : require('../../../assets/images/img7.jpg')
+                                            }
+                                            style={styles.commentUserImage}
+                                        />
+                                        <View style={styles.commentContent}>
+                                            <Text style={styles.commentUserName}>{comment.user?.name || 'Usuario'}</Text>
+                                            <Text style={styles.commentText}> {comment.text}</Text>
+                                        </View>
+                                        {comment.user?.id === currentUserId && (
+                                            <TouchableOpacity
+                                            onPress={() =>
+                                                Alert.alert('Eliminar comentario', '¿Quieres eliminar este comentario?', [
+                                                { text: 'Cancelar', style: 'cancel' },
+                                                {
+                                                    text: 'Eliminar',
+                                                    style: 'destructive',
+                                                    onPress: () => deleteComment(comment.id),
+                                                },
+                                                ])
+                                            }
+                                            style={{ padding: 4, marginLeft: 4 }}
+                                            >
+                                            <Ionicons name="trash-outline" size={20} color="red" />
+                                            </TouchableOpacity>
+                                        )}
+                                        </View>
+                                    ))
+                                    ) : (
+                                    <Text style={styles.noDataText}>No hay comentarios aún.</Text>
+                                    )}
+                                </View>
+                                </View>
+                            </ScrollView>
+
+                            {/* Input de comentario */}
+                            <View style={styles.commentInputRow}>
+                                <TextInput
+                                style={styles.commentInput}
+                                placeholder="Añadir un comentario..."
+                                placeholderTextColor="#888"
+                                value={newComment}
+                                onChangeText={setNewComment}
+                                />
+                                <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
+                                <Ionicons name="send" size={24} color={newComment.trim() ? "#bb86fc" : "#888"} />
+                                </TouchableOpacity>
+                            </View>
+                            </KeyboardAvoidingView>
+                        </Modal>
                         )}
-                        </View>
-                    ))
-                    ) : (
-                    <Text style={styles.noDataText}>No hay comentarios aún.</Text>
-                    )}
-                </View>
-                </View>
-                          
-                        </ScrollView>
-              
-                        {/* Comment Input */}
-                        <View style={styles.commentInputRow}>
-                          <TextInput
-                            style={styles.commentInput}
-                            placeholder="Añadir un comentario..."
-                            placeholderTextColor="#888"
-                            value={newComment}
-                            onChangeText={setNewComment}
-                          />
-                          <TouchableOpacity onPress={handleAddComment} disabled={!newComment.trim()}>
-                            <Ionicons name="send" size={24} color={newComment.trim() ? "#bb86fc" : "#888"} />
-                          </TouchableOpacity>
-                        </View>
-                      </KeyboardAvoidingView>
-                    </Modal>
-                  )}    
+    
             
         </ScrollView> 
             </MaxWidthContainer>
@@ -610,13 +612,21 @@ const styles = StyleSheet.create({
     // Modal Styles
     detailOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.97)',
-    },
+        backgroundColor: 'rgba(0,0,0,0.95)',
+        padding: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+     },
+      
     detailScroll: {
-        flex: 1,
-        paddingTop: Platform.OS === 'ios' ? 50 : 30,
-        paddingHorizontal: 15,
-    },
+       width: Platform.OS === 'web' ? 600 : '100%',
+       maxHeight: '90%',
+       backgroundColor: '#121212',
+       borderRadius: 20,
+       padding: 20,
+       overflowY: 'auto',
+      },
+      
     closeButton: {
         position: 'absolute',
         top: Platform.OS === 'ios' ? 50 : 20,
@@ -686,6 +696,7 @@ const styles = StyleSheet.create({
     commentInputRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         paddingHorizontal: 15,
         paddingVertical: 10,
         borderTopWidth: 1,
@@ -705,6 +716,7 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         marginRight: 10,
         fontSize: 15,
+        maxWidth: 800,
     },
     commentCard: {
         flexDirection: 'row',

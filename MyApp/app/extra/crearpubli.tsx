@@ -150,7 +150,7 @@ export default function CrearPubli() {
           <View style={styles.container}>
       
       {!uploadedImageUrl ? ( // 🔥 Si todavía NO tomaste foto
-        <>
+        <View>
           <CameraView style={{ width, height }} facing={facing} ref={cameraRef} />
   
           {/* 🔥 Botones sobre la cámara */}
@@ -167,7 +167,7 @@ export default function CrearPubli() {
               <Text style={styles.text}>📁</Text>
             </TouchableOpacity>
           </View>
-        </>
+        </View>
       ) : ( // 🔥 Si ya tomaste foto
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
           <View style={styles.previewContainer}>

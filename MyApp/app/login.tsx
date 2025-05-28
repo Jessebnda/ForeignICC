@@ -11,7 +11,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image
+  Image,
+  ViewStyle,
+  TextStyle,
+  ImageStyle,
+  StyleProp
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { 
@@ -35,6 +39,7 @@ import { Picker } from '@react-native-picker/picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { serverTimestamp as firebaseServerTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import MaxWidthContainer from '../components/MaxWidthContainer';
 
 
 
@@ -46,6 +51,48 @@ const WEB_CLIENT_ID = 'TU_WEB_CLIENT_ID.apps.googleusercontent.com';
 const IOS_CLIENT_ID = '497729458678-oovq36fgcgdm6ho6unb5rql4gg30cupn.apps.googleusercontent.com';
 const ANDROID_CLIENT_ID = 'TU_ANDROID_CLIENT_ID.apps.googleusercontent.com';
 const REDIRECT_URI = 'https://auth.expo.io/@jesse05/MyApp';
+
+interface Style {
+  container: ViewStyle;
+  maxWidthContainer: ViewStyle;
+  scrollContent: ViewStyle;
+  contentWrapper: ViewStyle;
+  loaderContainer: ViewStyle;
+  loaderText: TextStyle;
+  logoContainer: ViewStyle;
+  logo: ImageStyle;
+  appName: TextStyle;
+  formCard: ViewStyle;
+  tabContainer: ViewStyle;
+  tab: ViewStyle;
+  activeTab: ViewStyle;
+  tabText: TextStyle;
+  activeTabText: TextStyle;
+  formContent: ViewStyle;
+  inputContainer: ViewStyle;
+  inputIcon: TextStyle;
+  input: TextStyle;
+  interestsLabel: TextStyle;
+  interestsContainer: ViewStyle;
+  interestChip: ViewStyle;
+  interestChipSelected: ViewStyle;
+  interestChipText: TextStyle;
+  interestChipTextSelected: TextStyle;
+  loader: ViewStyle;
+  primaryButton: ViewStyle;
+  googleButton: ViewStyle;
+  secondaryButton: ViewStyle;
+  buttonText: TextStyle;
+  buttonIcon: TextStyle;
+  imagePickerContainer: ViewStyle;
+  imagePickerButton: ViewStyle;
+  imagePickerText: TextStyle;
+  imagePreviewContainer: ViewStyle;
+  imagePreview: ImageStyle;
+  changeImageButton: ViewStyle;
+  changeImageText: TextStyle;
+  picker: TextStyle;
+}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -394,197 +441,209 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        
-        <View style={styles.logoContainer}>
-          <Image source={require('../assets/images/logo.png.jpeg')} style={styles.logo} />
-          <Text style={styles.appName}>Foreign</Text>
-        </View>
-        
-        <View style={styles.formCard}>
-          <View style={styles.tabContainer}>
-            <TouchableOpacity 
-              style={[styles.tab, activeTab === 'login' && styles.activeTab]}
-              onPress={() => setActiveTab('login')}
-            >
-              <Text 
-                style={[styles.tabText, activeTab === 'login' && styles.activeTabText]}
-              >
-                Iniciar Sesión
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.tab, activeTab === 'signup' && styles.activeTab]}
-              onPress={() => setActiveTab('signup')}
-            >
-              <Text 
-                style={[styles.tabText, activeTab === 'signup' && styles.activeTabText]}
-              >
-                Registrarse
-              </Text>
-            </TouchableOpacity>
+      <MaxWidthContainer style={styles.maxWidthContainer}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsHorizontalScrollIndicator={false}>
+
+          <View style={styles.contentWrapper}>
+            <View style={styles.logoContainer}>
+              <Image source={require('../assets/images/logo.png.jpeg')} style={styles.logo} />
+              <Text style={styles.appName as TextStyle}>Foreign</Text>
+            </View>
+            
+            <View style={styles.formCard}>
+              <View style={styles.tabContainer}>
+                <TouchableOpacity 
+                  style={[styles.tab, activeTab === 'login' && styles.activeTab]}
+                  onPress={() => setActiveTab('login')}
+                >
+                  <Text style={[styles.tabText as TextStyle, activeTab === 'login' && styles.activeTabText as TextStyle]}>
+                    Iniciar Sesión
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.tab, activeTab === 'signup' && styles.activeTab]}
+                  onPress={() => setActiveTab('signup')}
+                >
+                  <Text style={[styles.tabText as TextStyle, activeTab === 'signup' && styles.activeTabText as TextStyle]}>
+                    Registrarse
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {activeTab === 'login' ? (
+                <View style={styles.formContent}>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="mail-outline" size={20} color="#888" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Correo electrónico"
+                      placeholderTextColor="#888"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="lock-closed-outline" size={20} color="#888" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Contraseña"
+                      placeholderTextColor="#888"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry
+                    />
+                  </View>
+
+                  {loading ? (
+                    <ActivityIndicator size="large" color="#bb86fc" style={styles.loader} />
+                  ) : (
+                    <>
+                      <TouchableOpacity style={styles.primaryButton} onPress={handleEmailLogin}>
+                        <Text style={styles.buttonText}>Iniciar Sesión</Text>
+                      </TouchableOpacity>
+                      
+                      {/* <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin} disabled={!request}>
+                        <Ionicons name="logo-google" size={20} color="#fff" style={styles.buttonIcon} />
+                        <Text style={styles.buttonText}>Continuar con Google</Text>
+                      </TouchableOpacity> */}
+                      
+                      <TouchableOpacity style={styles.secondaryButton} onPress={handleAnonymousLogin}>
+                        <Ionicons name="person-outline" size={20} color="#fff" style={styles.buttonIcon} />
+                        <Text style={styles.buttonText}>Entrar como Invitado</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.formContent}>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="person-outline" size={20} color="#888" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Nombre completo"
+                      placeholderTextColor="#888"
+                      value={name}
+                      onChangeText={setName}
+                    />
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="location-outline" size={20} color="#888" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Lugar de origen"
+                      placeholderTextColor="#888"
+                      value={originPlace}
+                      onChangeText={setOriginPlace}
+                    />
+                  </View>
+                  
+                  {renderUniversitySelect()}
+                  {renderImagePicker()}
+                  
+                  <Text style={styles.interestsLabel}>Intereses (selecciona al menos uno):</Text>
+                  <View style={styles.interestsContainer}>
+                    {availableInterests.map(interest => (
+                      <TouchableOpacity 
+                        key={interest}
+                        style={[
+                          styles.interestChip,
+                          interests.includes(interest) && styles.interestChipSelected
+                        ]}
+                        onPress={() => toggleInterest(interest)}
+                      >
+                        <Text 
+                          style={[
+                            styles.interestChipText,
+                            interests.includes(interest) && styles.interestChipTextSelected
+                          ]}
+                        >
+                          {interest}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="mail-outline" size={20} color="#888" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Correo electrónico"
+                      placeholderTextColor="#888"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="lock-closed-outline" size={20} color="#888" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Contraseña"
+                      placeholderTextColor="#888"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry
+                    />
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="checkmark-circle-outline" size={20} color="#888" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Confirmar contraseña"
+                      placeholderTextColor="#888"
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      secureTextEntry
+                    />
+                  </View>
+
+                  {loading ? (
+                    <ActivityIndicator size="large" color="#bb86fc" style={styles.loader} />
+                  ) : (
+                    <>
+                      <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp}>
+                        <Text style={styles.buttonText}>Crear Cuenta</Text>
+                      </TouchableOpacity>
+                      
+                      {/* <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin} disabled={!request}>
+                        <Ionicons name="logo-google" size={20} color="#fff" style={styles.buttonIcon} />
+                        <Text style={styles.buttonText}>Registrarse con Google</Text>
+                      </TouchableOpacity> */}
+                    </>
+                  )}
+                </View>
+              )}
+            </View>
           </View>
-
-          {activeTab === 'login' ? (
-            <View style={styles.formContent}>
-              <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={20} color="#888" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Correo electrónico"
-                  placeholderTextColor="#888"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={20} color="#888" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Contraseña"
-                  placeholderTextColor="#888"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                />
-              </View>
-
-              {loading ? (
-                <ActivityIndicator size="large" color="#bb86fc" style={styles.loader} />
-              ) : (
-                <>
-                  <TouchableOpacity style={styles.primaryButton} onPress={handleEmailLogin}>
-                    <Text style={styles.buttonText}>Iniciar Sesión</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin} disabled={!request}>
-                    <Ionicons name="logo-google" size={20} color="#fff" style={styles.buttonIcon} />
-                    <Text style={styles.buttonText}>Continuar con Google</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.secondaryButton} onPress={handleAnonymousLogin}>
-                    <Ionicons name="person-outline" size={20} color="#fff" style={styles.buttonIcon} />
-                    <Text style={styles.buttonText}>Entrar como Invitado</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          ) : (
-            <View style={styles.formContent}>
-              <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={20} color="#888" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Nombre completo"
-                  placeholderTextColor="#888"
-                  value={name}
-                  onChangeText={setName}
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Ionicons name="location-outline" size={20} color="#888" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Lugar de origen"
-                  placeholderTextColor="#888"
-                  value={originPlace}
-                  onChangeText={setOriginPlace}
-                />
-              </View>
-              
-              {renderUniversitySelect()}
-              {renderImagePicker()}
-              
-              <Text style={styles.interestsLabel}>Intereses (selecciona al menos uno):</Text>
-              <View style={styles.interestsContainer}>
-                {availableInterests.map(interest => (
-                  <TouchableOpacity 
-                    key={interest}
-                    style={[
-                      styles.interestChip,
-                      interests.includes(interest) && styles.interestChipSelected
-                    ]}
-                    onPress={() => toggleInterest(interest)}
-                  >
-                    <Text 
-                      style={[
-                        styles.interestChipText,
-                        interests.includes(interest) && styles.interestChipTextSelected
-                      ]}
-                    >
-                      {interest}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={20} color="#888" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Correo electrónico"
-                  placeholderTextColor="#888"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={20} color="#888" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Contraseña"
-                  placeholderTextColor="#888"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                />
-              </View>
-              
-              <View style={styles.inputContainer}>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#888" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Confirmar contraseña"
-                  placeholderTextColor="#888"
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry
-                />
-              </View>
-
-              {loading ? (
-                <ActivityIndicator size="large" color="#bb86fc" style={styles.loader} />
-              ) : (
-                <>
-                  <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp}>
-                    <Text style={styles.buttonText}>Crear Cuenta</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin} disabled={!request}>
-                    <Ionicons name="logo-google" size={20} color="#fff" style={styles.buttonIcon} />
-                    <Text style={styles.buttonText}>Registrarse con Google</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          )}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </MaxWidthContainer>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create<Style>({
   container: { 
     flex: 1, 
     backgroundColor: '#121212',
+  },
+  maxWidthContainer: {
+    backgroundColor: '#121212',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    minHeight: Platform.OS === 'web' ? '100%' : 'auto',
+  },
+  contentWrapper: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
   },
   loaderContainer: {
     flex: 1,
@@ -596,11 +655,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: '#fff',
     fontSize: 16,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
   },
   logoContainer: {
     alignItems: 'center',
@@ -629,6 +683,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.27,
     shadowRadius: 4.65,
     elevation: 6,
+    margin: Platform.OS === 'web' ? 20 : 0,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -669,7 +724,6 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   input: {
-    flex: 1,
     height: 48,
     color: '#fff',
     fontSize: 16,
@@ -781,10 +835,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   picker: {
-    flex: 1,
     color: '#000',
     fontSize: 16,
-  },  
+  },
 });
 function serverTimestamp(): any {
   return firebaseServerTimestamp();

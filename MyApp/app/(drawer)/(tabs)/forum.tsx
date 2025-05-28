@@ -135,6 +135,7 @@ export default function ForumScreen() {
         <FlatList
           data={forumData}
           keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }

@@ -153,7 +153,10 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
       <MaxWidthContainer>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        >
           {sections.map((section) => (
             <View key={section.id} style={styles.sectionContainer}>
               <Text style={styles.subtitle}>Gestión de {section.title}</Text>

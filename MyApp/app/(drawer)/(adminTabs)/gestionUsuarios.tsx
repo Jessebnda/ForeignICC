@@ -605,6 +605,7 @@ export default function ManagementScreen() {
         ) : (
           <FlatList
             data={filteredItems}
+            showsHorizontalScrollIndicator={false}
             renderItem={renderItem}
             keyExtractor={item => item.id}
             contentContainerStyle={styles.listContainer}

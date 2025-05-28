@@ -1,14 +1,14 @@
 import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform, ViewStyle } from 'react-native';
 
 type MaxWidthContainerProps = {
   children: React.ReactNode;
-  style?: any;
+  style?: ViewStyle;
 };
 
 export default function MaxWidthContainer({ children, style }: MaxWidthContainerProps) {
   if (Platform.OS !== 'web') {
-    return <View style={{ flex: 1 }}>{children}</View>;
+    return <View style={[styles.nativeContainer, style]}>{children}</View>;
   }
   
   return (
@@ -25,10 +25,16 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  nativeContainer: {
+    flex: 1,
+    width: '100%',
   },
   innerContainer: {
     flex: 1,
     width: '100%',
-    maxWidth: 600, // Por defecto, similar a Instagram
+    maxWidth: 800,
+    paddingHorizontal: Platform.OS === 'web' ? 16 : 0,
   },
 });

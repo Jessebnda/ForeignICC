@@ -52,6 +52,8 @@ const { width } = Dimensions.get('window');
 const horizontalPadding = 16;
 const sliderWidth = width - horizontalPadding * 4;
 
+const numColumns = Platform.OS === 'web' ? 4 : 2;
+
 
 function WeeklyEventsSlider({ friendPosts, onPressItem }: WeeklyEventsSliderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -445,12 +447,10 @@ export default function FeedScreen() {
         <FlatList
           data={universityPosts}
           keyExtractor={(item) => item.id}
-          numColumns={2}
+          numColumns={numColumns}
           columnWrapperStyle={styles.postRow}
           renderItem={renderPost}
-          ListHeaderComponent={
-            <WeeklyEventsSlider friendPosts={friendPosts} onPressItem={goToPostDetail} />
-          }
+          ListHeaderComponent={Platform.OS === 'web' ? null : undefined}
           style={styles.container}
           contentContainerStyle={styles.contentContainer}
           refreshControl={
@@ -595,9 +595,7 @@ export default function FeedScreen() {
   );
 }
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  contentContainer: { padding: 16 },
-
+  
   // Slider
   sliderWrapper: { marginBottom: 24 },
   sliderTitle: {
@@ -608,7 +606,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   roundedContainer: { borderRadius: 20, overflow: 'hidden' },
-  sliderImage: { height: width * 0.7 },
   sliderOverlay: {
     position: 'absolute',
     bottom: 10,
@@ -639,16 +636,6 @@ const styles = StyleSheet.create({
   },
   dotActive: { backgroundColor: '#bb86fc', width: 10, height: 10 },
 
-  // Grid de posts
-  postRow: { justifyContent: 'space-between', marginBottom: 16 },
-  postCard: {
-    width: '48%',
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#1e1e1e',
-    marginBottom: 16,
-    elevation: 2,
-  },
   postImage: { width: '100%', height: 140 },
   postOverlay: {
     position: 'absolute',
@@ -673,7 +660,7 @@ const styles = StyleSheet.create({
   },
   // FAB
   fab: {
-    position: 'absolute',
+    position: Platform.OS === 'web' ? 'fixed' : 'absolute',
     bottom: 30,
     right: 20,
     backgroundColor: '#4f0c2e',
@@ -692,16 +679,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 32,
     lineHeight: 34,
-  },
-  detailOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.95)',
-    padding: 20,
-    justifyContent: 'center',
   },
   detailImage: {
     width: '100%',
@@ -734,6 +711,7 @@ const styles = StyleSheet.create({
   commentInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 15,
     paddingVertical: 10,
     borderTopWidth: 1,
@@ -753,6 +731,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginRight: 10,
     fontSize: 15,
+    maxWidth: 800,
   },
   sendButton: {
     color: '#bb86fc',
@@ -809,9 +788,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  detailScroll: {
-    paddingBottom: 80,
-  } ,
   detailAuthor: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -885,4 +861,42 @@ authorContainer: {
   gap: 10, // si usas React Native >= 0.71
   marginBottom: 12,
 },
+  container: { flex: 1, backgroundColor: '#121212' },
+  contentContainer: {
+    padding: 16,
+    paddingBottom: Platform.OS === 'web' ? 80 : 16,
+  },
+  postRow: {
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  postCard: {
+    flex: 1,
+    margin: 8,
+    maxWidth: Platform.OS === 'web' ? '23%' : '48%',
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 2,
+  },
+  sliderImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 12,
+  },
+  detailOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailScroll: {
+    width: Platform.OS === 'web' ? 600 : '100%',
+    maxHeight: '90%',
+    backgroundColor: '#121212',
+    borderRadius: 20,
+    padding: 20,
+    overflowY: 'auto',
+  },
 });
