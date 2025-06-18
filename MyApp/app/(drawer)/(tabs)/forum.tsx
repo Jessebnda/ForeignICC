@@ -91,7 +91,7 @@ export default function ForumScreen() {
 
   const goToQuestionDetail = (item: ForumQuestion) => {
     router.push({
-      pathname: '/extra/question-detail',  // ✅ Ruta absoluta correcta
+      pathname: '/extra/questionDetail',  // ✅ Ruta absoluta correcta
       params: { questionId: item.id }
     });
   };

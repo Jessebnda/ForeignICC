@@ -1,5 +1,5 @@
 import { ref, push, serverTimestamp, onChildAdded, off, query, orderByChild, limitToLast } from "firebase/database";
-import { database } from '../../firebase'; // Adjust path if needed
+import { database } from '../firebase'; // Adjust path if needed
 import { useState, useEffect } from 'react';
 import { getAuth } from 'firebase/auth';
 

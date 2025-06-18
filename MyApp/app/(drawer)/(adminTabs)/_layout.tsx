@@ -41,9 +41,9 @@ export default function StackHome() {
       />
 
       <Stack.Screen
-        name="gestionUsuarios"
+        name="manageUsers"
         options={{
-          headerTitle: "Gestión de Usuarios",
+          headerTitle: "Users Management",
         }}
       />
 

@@ -1,7 +1,7 @@
 // app/(tabs)/chatbot.tsx
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { fetchChatbotAnswer } from '../services/api_service';
+import { fetchChatbotAnswer } from '../../services/api_service';
 import type { ChatMessage } from '../models/chat_message';
 import MaxWidthContainer from '../../components/MaxWidthContainer';
 

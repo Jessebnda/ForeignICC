@@ -160,7 +160,7 @@ export default function ProfileScreen() {
     const navigateToEditProfile = () => {
         if (!userProfile) return;
         router.push({
-            pathname: '/extra/edit-profile',
+            pathname: '/extra/editProfile',
             // Pass necessary profile data, ensure it's serializable
             params: { profile: JSON.stringify({
                 name: userProfile.name,

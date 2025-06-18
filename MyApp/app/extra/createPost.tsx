@@ -14,7 +14,7 @@ import MaxWidthContainer from '../../components/MaxWidthContainer';
 
 
 
-export default function CrearPubli() {
+export default function createPost() {
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);

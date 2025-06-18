@@ -279,13 +279,13 @@ export default function NotificationsScreen() {
     } else if (item.type.startsWith('forum_question_')) {
       // Navegar a la pregunta del foro
       router.push({
-        pathname: '/extra/question-detail',
+        pathname: '/extra/questionDetail',
         params: { questionId: item.contentId }
       });
     } else if (item.type.startsWith('forum_answer_')) {
       // Navegar a la respuesta dentro de la pregunta
       router.push({
-        pathname: '/extra/question-detail',
+        pathname: '/extra/questionDetail',
         params: { 
           questionId: item.relatedContentId,
           scrollToAnswerId: item.contentId

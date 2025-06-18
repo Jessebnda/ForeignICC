@@ -315,7 +315,7 @@ export default function FeedScreen() {
     }, [selectedPost, currentUserId]);
 
   const goToCreatePost = () => {
-    router.push({ pathname: '/extra/crearpubli' });
+    router.push({ pathname: '/extra/createPost' });
   };
 
   const deletePost = async (postId: string) => {

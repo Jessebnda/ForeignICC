@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import MentorListScreen from '../../extra/mentor-list';
+import MentorListScreen from '../../extra/mentorList';
 import ChatbotScreen from '../../extra/chatbot';
-import ReceivedChatsScreen from '../../extra/received-chats';
+import ReceivedChatsScreen from '../../extra/receivedChats';
 import { useUser } from '../../../context/UserContext';
 import MaxWidthContainer from '../../../components/MaxWidthContainer';
 

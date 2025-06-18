@@ -1,4 +1,4 @@
-// app/(tabs)/edit-profile.tsx
+// app/(tabs)/editProfile.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import {
     View,

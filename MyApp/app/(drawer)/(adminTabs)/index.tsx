@@ -109,7 +109,7 @@ export default function App() {
       count: counts.students,
       loading: loading.students,
       action: 'Ir a la gestión de Estudiantes',
-      path: 'gestionUsuarios' // 🔥 Agregado path
+      path: 'manageUsers' // 🔥 Agregado path
     },
     {
       id: 'mentors',
@@ -118,7 +118,7 @@ export default function App() {
       count: counts.mentors,
       loading: loading.mentors,
       action: 'Ir a la gestión de Mentores',
-      path: 'gestionMentores' // 🔥 Agregado path
+      path: 'manageMentors' // 🔥 Agregado path
     },
     {
       id: 'posts',

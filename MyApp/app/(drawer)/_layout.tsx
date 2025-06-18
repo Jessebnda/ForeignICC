@@ -119,14 +119,14 @@ function CustomDrawerContent({ userId }: { userId: string }) {
   const menuItems: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
     { title: "User", icon: "account", path: '/(tabs)/profile' },
     { title: "Messages", icon: "message", path: 'extra/messages' }, 
-    { title: "Friend request", icon: "account-plus", path: '/extra/AmigosScreen' },
+    { title: "Friend request", icon: "account-plus", path: '/extra/friendRequest' },
     { title: "Configuración", icon: "cog", path: '/settings' },  // Esta línea debe apuntar a '/settings'
   ];
 
   const menuItemsAdmin: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
     { title: "User", icon: "account", path: '/(tabs)/profile' },
     { title: "Messages", icon: "message", path: '/extra/messages' }, 
-    { title: "Friend request", icon: "account-plus", path: '/extra/AmigosScreen' },
+    { title: "Friend request", icon: "account-plus", path: '/extra/friendRequest' },
     { title: "Configuración", icon: "cog", path: '/settings' },  // Esta línea debe apuntar a '/settings'
     { title: "Dashboard", icon: "powershell", path: '/(adminTabs)' },
   ];

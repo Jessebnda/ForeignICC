@@ -9,7 +9,7 @@ import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { firestore, database } from '../../firebase';              
-import { useChatMessages, sendMessage, generateChatId, RealtimeChatMessage } from '../services/chatService';
+import { useChatMessages, sendMessage, generateChatId, RealtimeChatMessage } from '../../services/chatService';
 import { ref, update, get } from 'firebase/database'; // Asegúrate de importar update y get
 import MaxWidthContainer from '../../components/MaxWidthContainer';
 

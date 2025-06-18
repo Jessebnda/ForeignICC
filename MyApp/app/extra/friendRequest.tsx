@@ -27,7 +27,7 @@ type UserData = {
   pendingRequests?: string[];
 };
 
-export default function AmigosScreen() {
+export default function friendRequest() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [friends, setFriends] = useState<string[]>([]);
   const currentUser = getAuth().currentUser;

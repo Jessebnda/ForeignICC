@@ -164,7 +164,7 @@ export default function QuestionDetailScreen() {
 
   const goToAnswerDetail = (answer: ForumAnswer) => {
     router.push({
-      pathname: '/extra/answer-detail',
+      pathname: '/extra/answerDetail',
       params: { 
         questionId: questionId as string,
         answerId: answer.id
