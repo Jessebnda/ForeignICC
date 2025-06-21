@@ -1,7 +1,7 @@
 // /hooks/useMarkers.ts
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { LatLng } from 'react-native-maps';
-import { GooglePlacesService } from '../services/googlePlacesService';
+import { GooglePlacesService } from '../../services/googlePlacesService';
 
 export type MarkerData = {
   id: string;

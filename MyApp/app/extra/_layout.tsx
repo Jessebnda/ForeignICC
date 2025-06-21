@@ -27,16 +27,16 @@ export default function ExtraLayout() {
       {/* Asegúrate de que todas las pantallas bajo 'extra' estén definidas aquí */}
       <Stack.Screen name="messages" options={{ title: 'Mensajes' }} />
       <Stack.Screen name="notifications" options={{ title: 'Notificaciones' }} />
-      <Stack.Screen name="perfil" options={{ title: 'Perfil de Amigo' }} />
+      <Stack.Screen name="friendProfile" options={{ title: 'Perfil de Amigo' }} />
       <Stack.Screen name="chat" options={{ title: 'Chat' }} /> 
-      <Stack.Screen name="crearpubli" options={{ title: 'Crear Publicación' }} />
-      <Stack.Screen name="edit-profile" options={{ title: 'Editar Perfil' }} />
-      <Stack.Screen name="question-detail" options={{ title: 'Detalle Pregunta' }} />
-      <Stack.Screen name="answer-detail" options={{ title: 'Detalle Respuesta' }} />
-      <Stack.Screen name="mentor-list" options={{ title: 'Mentores' }} />
-      <Stack.Screen name="mentor-chat" options={{ title: 'Chat con Mentor' }} />
+      <Stack.Screen name="createPost" options={{ title: 'Crear Publicación' }} />
+      <Stack.Screen name="editProfile" options={{ title: 'Editar Perfil' }} />
+      <Stack.Screen name="questionDetail" options={{ title: 'Detalle Pregunta' }} />
+      <Stack.Screen name="answerDetail" options={{ title: 'Detalle Respuesta' }} />
+      <Stack.Screen name="mentorList" options={{ title: 'Mentores' }} />
+      <Stack.Screen name="mentorChat" options={{ title: 'Chat con Mentor' }} />
       <Stack.Screen name="chatbot" options={{ title: 'Chatbot Asistente' }} />
-      <Stack.Screen name="AmigosScreen" options={{ title: 'Buscar Amigos' }} />
+      <Stack.Screen name="friendRequest" options={{ title: 'Buscar Amigos' }} />
       {/* Si tienes más pantallas en 'extra', añádelas aquí */}
 
     </Stack>

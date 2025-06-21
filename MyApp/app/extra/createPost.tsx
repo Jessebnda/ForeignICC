@@ -1,6 +1,6 @@
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { useRef, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Alert, Image, ScrollView, TextInput } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Alert, Image, ScrollView, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -10,11 +10,11 @@ import { getAuth } from 'firebase/auth';
 import { firestore } from '../../firebase';
 import { useRouter } from 'expo-router';
 import { Dimensions } from 'react-native';
+import MaxWidthContainer from '../../components/MaxWidthContainer';
 
 
 
-
-export default function CrearPubli() {
+export default function createPost() {
   const [facing, setFacing] = useState<CameraType>('back');
   const [permission, requestPermission] = useCameraPermissions();
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
@@ -139,10 +139,18 @@ export default function CrearPubli() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'black' }}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      style={{flex: 1}}
+    >
+      <MaxWidthContainer style={{maxWidth: 800}}>
+        <ScrollView 
+          contentContainerStyle={styles.scroll}
+        >
+          <View style={styles.container}>
       
       {!uploadedImageUrl ? ( // 🔥 Si todavía NO tomaste foto
-        <>
+        <View>
           <CameraView style={{ width, height }} facing={facing} ref={cameraRef} />
   
           {/* 🔥 Botones sobre la cámara */}
@@ -159,7 +167,7 @@ export default function CrearPubli() {
               <Text style={styles.text}>📁</Text>
             </TouchableOpacity>
           </View>
-        </>
+        </View>
       ) : ( // 🔥 Si ya tomaste foto
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
           <View style={styles.previewContainer}>
@@ -187,6 +195,9 @@ export default function CrearPubli() {
         </ScrollView>
       )}
     </View>
+      </ScrollView>
+      </MaxWidthContainer>
+    </KeyboardAvoidingView>
   );
   
   

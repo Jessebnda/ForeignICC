@@ -249,7 +249,7 @@ export default function MessagesScreen() {
             </Text>
             <TouchableOpacity 
               style={styles.addFriendButton}
-              onPress={() => router.push('/extra/AmigosScreen')}
+              onPress={() => router.push('/extra/friendRequest')}
             >
               <Text style={styles.addFriendText}>Agregar amigos</Text>
             </TouchableOpacity>

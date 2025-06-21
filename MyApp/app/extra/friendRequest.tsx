@@ -9,12 +9,15 @@ import {
   Alert,
   RefreshControl,
   ActivityIndicator,
-  Animated
+  Animated,
+  ScrollView,
+  Platform
 } from 'react-native';
 import { collection, getDocs, doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { firestore } from '../../firebase';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import MaxWidthContainer from '../../components/MaxWidthContainer';
 
 type UserData = {
   id: string;
@@ -24,7 +27,7 @@ type UserData = {
   pendingRequests?: string[];
 };
 
-export default function AmigosScreen() {
+export default function friendRequest() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [friends, setFriends] = useState<string[]>([]);
   const currentUser = getAuth().currentUser;
@@ -275,26 +278,31 @@ export default function AmigosScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        <Ionicons name="people" size={24} color="#bb86fc" /> Buscar amigos
-      </Text>
-      
-      <FlatList
-        data={users}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContainer}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={onRefresh}
-            colors={['#bb86fc']}
-            tintColor="#bb86fc"
+      <MaxWidthContainer style={styles.contentContainer}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <Text style={styles.title}>
+            <Ionicons name="people" size={24} color="#bb86fc" /> Buscar amigos
+          </Text>
+          
+          <FlatList
+            data={users}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContainer}
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={onRefresh}
+                colors={['#bb86fc']}
+                tintColor="#bb86fc"
+              />
+            }
+            ListEmptyComponent={EmptyListComponent}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={false}
           />
-        }
-        ListEmptyComponent={EmptyListComponent}
-        showsVerticalScrollIndicator={false}
-      />
+        </ScrollView>
+      </MaxWidthContainer>
     </View>
   );
 }
@@ -303,8 +311,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
-    paddingHorizontal: 16,
-    paddingTop: 20,
+  },
+  contentContainer: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 768,
+    paddingHorizontal: Platform.OS === 'web' ? 0 : 16,
   },
   title: {
     fontSize: 24,
@@ -313,11 +325,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
     letterSpacing: 0.5,
+    paddingTop: 20,
   },
   listContainer: {
-    paddingBottom: 40,
-    paddingTop: 10,
     flexGrow: 1,
+    paddingBottom: 40,
   },
   card: {
     backgroundColor: '#bb86fc',

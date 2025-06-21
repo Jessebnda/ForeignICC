@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, firestore, database } from '../../../firebase';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View, Platform, StyleSheet } from 'react-native';
 import { useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { DrawerActions } from '@react-navigation/native';
@@ -140,6 +140,11 @@ export default function TabLayout() {
             )}
           </TouchableOpacity>
         ),
+        ...(Platform.OS === 'web' ? {
+          contentStyle: {
+            alignItems: 'center',
+          }
+        } : {})
       }}
     >
       <Tabs.Screen 
@@ -161,7 +166,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="map" color={color} size={size} />
           ),
-          // Esta es la línea importante:
           tabBarBadge: hasUnreadRaiteRequests ? "!" : undefined,
           tabBarBadgeStyle: { backgroundColor: '#FF6B6B' }
         }}
@@ -209,3 +213,12 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+// Add these styles if you're using Option 2
+const styles = StyleSheet.create({
+  webContainer: {
+    flex: 1,
+    maxWidth: 768,
+    width: '100%',
+  }
+});

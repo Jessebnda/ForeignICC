@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotifications } from '../../context/NotificationContext';
 import * as Haptics from 'expo-haptics';
+import MaxWidthContainer from '../../components/MaxWidthContainer';
 
 // Define los tipos de notificación para TypeScript
 interface MessageNotification {
@@ -278,13 +279,13 @@ export default function NotificationsScreen() {
     } else if (item.type.startsWith('forum_question_')) {
       // Navegar a la pregunta del foro
       router.push({
-        pathname: '/extra/question-detail',
+        pathname: '/extra/questionDetail',
         params: { questionId: item.contentId }
       });
     } else if (item.type.startsWith('forum_answer_')) {
       // Navegar a la respuesta dentro de la pregunta
       router.push({
-        pathname: '/extra/question-detail',
+        pathname: '/extra/questionDetail',
         params: { 
           questionId: item.relatedContentId,
           scrollToAnswerId: item.contentId
@@ -312,76 +313,78 @@ export default function NotificationsScreen() {
   // Resto del renderizado con ScrollView y RefreshControl
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notificaciones</Text>
-        {hasUnread && (
-          <TouchableOpacity 
-            style={styles.markAllButton}
-            onPress={handleMarkAllAsRead}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#bb86fc" />
-            ) : (
-              <Text style={styles.markAllText}>Marcar todo como leído</Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-      
-      <ScrollView
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={onRefresh} 
-            colors={["#bb86fc"]}
-            tintColor="#bb86fc"
-          />
-        }
-        contentContainerStyle={styles.scrollContent}
-      >
-        {allNotifications.length > 0 ? (
-          allNotifications.map((item, index) => (
-          <TouchableOpacity 
-              key={isMessageNotification(item) ? `message-${item.chatId}-${index}` : `notification-${item.id}-${index}`}
-            style={[
-              styles.notificationItem, 
-              (item.type === 'message' || !item.read) ? styles.unreadItem : null
-            ]} 
-            onPress={() => handleNotificationPress(item)}
-          >
-            <View style={styles.avatarContainer}>
-              <Image 
-                  source={renderAvatar(item)} 
-                style={styles.avatar} 
-              />
-              <View style={styles.iconOverlay}>
-                {renderNotificationIcon(item)}
+      <MaxWidthContainer style={{maxWidth: 800}}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Notificaciones</Text>
+          {hasUnread && (
+            <TouchableOpacity 
+              style={styles.markAllButton}
+              onPress={handleMarkAllAsRead}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#bb86fc" />
+              ) : (
+                <Text style={styles.markAllText}>Marcar todo como leído</Text>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        <ScrollView
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh} 
+              colors={["#bb86fc"]}
+              tintColor="#bb86fc"
+            />
+          }
+          contentContainerStyle={styles.scrollContent}
+        >
+          {allNotifications.length > 0 ? (
+            allNotifications.map((item, index) => (
+            <TouchableOpacity 
+                key={isMessageNotification(item) ? `message-${item.chatId}-${index}` : `notification-${item.id}-${index}`}
+              style={[
+                styles.notificationItem, 
+                (item.type === 'message' || !item.read) ? styles.unreadItem : null
+              ]} 
+              onPress={() => handleNotificationPress(item)}
+            >
+              <View style={styles.avatarContainer}>
+                <Image 
+                    source={renderAvatar(item)} 
+                  style={styles.avatar} 
+                />
+                <View style={styles.iconOverlay}>
+                  {renderNotificationIcon(item)}
+                </View>
               </View>
-            </View>
-            
-            <View style={styles.notificationContent}>
-              {renderNotificationTitle(item)}
-              {renderNotificationContent(item)}
-              <Text style={styles.notificationTime}>
-                {new Date(item.timestamp).toLocaleString()}
+              
+              <View style={styles.notificationContent}>
+                {renderNotificationTitle(item)}
+                {renderNotificationContent(item)}
+                <Text style={styles.notificationTime}>
+                  {new Date(item.timestamp).toLocaleString()}
+                </Text>
+              </View>
+              
+              {(item.type === 'message' || !item.read) && (
+                <View style={styles.unreadIndicator} />
+              )}
+            </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="notifications-outline" size={64} color="#555" />
+              <Text style={styles.emptyText}>
+                No tienes notificaciones
               </Text>
             </View>
-            
-            {(item.type === 'message' || !item.read) && (
-              <View style={styles.unreadIndicator} />
-            )}
-          </TouchableOpacity>
-          ))
-        ) : (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="notifications-outline" size={64} color="#555" />
-            <Text style={styles.emptyText}>
-              No tienes notificaciones
-            </Text>
-          </View>
-        )}
-      </ScrollView>
+          )}
+        </ScrollView>
+      </MaxWidthContainer>
     </View>
   );
 }

@@ -10,7 +10,10 @@ import {
   ScrollView,
   Alert,
   SafeAreaView,
-  ActivityIndicator 
+  ActivityIndicator,
+  Platform,
+  Linking,
+  Dimensions
 } from 'react-native';
 import * as Location from 'expo-location';
 import { firestore } from '../../../firebase';
@@ -23,12 +26,203 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 import { database } from '../../../firebase'; 
 import { set, ref as DatabaseRef, remove, onValue } from 'firebase/database';
-import MapView, { Marker, LatLng, Polyline } from 'react-native-maps';
+import MapView, { Marker, LatLng, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useRaite } from '../../../context/RaiteContext';
 import { Ionicons } from '@expo/vector-icons';
 
-const availablePlaceTypes = ['gym', 'store', 'bar', 'restaurant', 'favoritos'];
+const { width, height } = Dimensions.get('window');
+const ASPECT_RATIO = width / height;
+const LATITUDE_DELTA = 0.0922;
+const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
+
+// Estilo del mapa - oscuro
+const mapStyle = [
+  {
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#212121"
+      }
+    ]
+  },
+  {
+    "elementType": "labels.icon",
+    "stylers": [
+      {
+        "visibility": "off"
+      }
+    ]
+  },
+  {
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#757575"
+      }
+    ]
+  },
+  {
+    "elementType": "labels.text.stroke",
+    "stylers": [
+      {
+        "color": "#212121"
+      }
+    ]
+  },
+  {
+    "featureType": "administrative",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#757575"
+      }
+    ]
+  },
+  {
+    "featureType": "administrative.country",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#9e9e9e"
+      }
+    ]
+  },
+  {
+    "featureType": "administrative.land_parcel",
+    "stylers": [
+      {
+        "visibility": "off"
+      }
+    ]
+  },
+  {
+    "featureType": "administrative.locality",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#bdbdbd"
+      }
+    ]
+  },
+  {
+    "featureType": "poi",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#757575"
+      }
+    ]
+  },
+  {
+    "featureType": "poi.park",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#181818"
+      }
+    ]
+  },
+  {
+    "featureType": "poi.park",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#616161"
+      }
+    ]
+  },
+  {
+    "featureType": "poi.park",
+    "elementType": "labels.text.stroke",
+    "stylers": [
+      {
+        "color": "#1b1b1b"
+      }
+    ]
+  },
+  {
+    "featureType": "road",
+    "elementType": "geometry.fill",
+    "stylers": [
+      {
+        "color": "#2c2c2c"
+      }
+    ]
+  },
+  {
+    "featureType": "road",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#8a8a8a"
+      }
+    ]
+  },
+  {
+    "featureType": "road.arterial",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#373737"
+      }
+    ]
+  },
+  {
+    "featureType": "road.highway",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#3c3c3c"
+      }
+    ]
+  },
+  {
+    "featureType": "road.highway.controlled_access",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#4e4e4e"
+      }
+    ]
+  },
+  {
+    "featureType": "road.local",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#616161"
+      }
+    ]
+  },
+  {
+    "featureType": "transit",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#757575"
+      }
+    ]
+  },
+  {
+    "featureType": "water",
+    "elementType": "geometry",
+    "stylers": [
+      {
+        "color": "#000000"
+      }
+    ]
+  },
+  {
+    "featureType": "water",
+    "elementType": "labels.text.fill",
+    "stylers": [
+      {
+        "color": "#3d3d3d"
+      }
+    ]
+  }
+];
 
 export default function MapScreen() {
   const router = useRouter();
@@ -632,6 +826,27 @@ export default function MapScreen() {
     );
   };
 
+  // Early return for web platform
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webContainer}>
+        <View style={styles.webContent}>
+          <Ionicons name="phone-portrait-outline" size={64} color="#bb86fc" />
+          <Text style={styles.webTitle}>Disponible solo en dispositivos móviles</Text>
+          <Text style={styles.webDescription}>
+            Esta función está optimizada para la experiencia móvil. Por favor, descarga nuestra aplicación para acceder a todas las funcionalidades del mapa.
+          </Text>
+          <TouchableOpacity 
+            style={styles.downloadButton}
+            onPress={() => Linking.openURL('https://play.google.com/store')}
+          >
+            <Text style={styles.downloadButtonText}>Descargar App</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   // ─── CONDICIONAL PARA CARGAR EL MAPA ─────────────────────────────
   // Si no se ha obtenido la ubicación (o aún se está cargando), mostramos un indicador.
   if (!userLocation) {
@@ -646,57 +861,23 @@ export default function MapScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      
-      {/* Header con filtros */}
-      <View style={styles.header}>
-        <ScrollView 
-          horizontal 
-          style={styles.chipsContainer} 
-          contentContainerStyle={styles.chipsContent} 
-          showsHorizontalScrollIndicator={false}
-        >
-          {availablePlaceTypes.map((type) => {
-            const selected = pendingTypes.includes(type);
-            return (
-              <TouchableOpacity
-                key={type}
-                style={[styles.chip, selected && styles.chipSelected]}
-                onPress={() => toggleTypeSelection(type)}
-              >
-                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                  {type.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-  
-        {hasChanges && (
-          <TouchableOpacity 
-            style={styles.confirmButton} 
-            onPress={handleApplyFilters} 
-            disabled={isLoading}
-          >
-            <Text style={styles.confirmButtonText}>
-              {isLoading ? 'Buscando...' : 'Aplicar Filtros'}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+    
   
       {/* Mapa */}
       <View style={styles.mapContainer}>
         <MapView
            ref={mapRef}
           style={styles.map}
+          provider={PROVIDER_GOOGLE}
           initialRegion={{
             latitude: userLocation.latitude,
             longitude: userLocation.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
+            latitudeDelta: LATITUDE_DELTA,
+            longitudeDelta: LONGITUDE_DELTA,
           }}
           onLongPress={handleLongPress}
           onPress={isRaiteActive ? handleMapPress : undefined}
+          customMapStyle={mapStyle}
         >
           {/* Marker de usuario */}
           {userLocation && (
@@ -798,19 +979,19 @@ export default function MapScreen() {
           )}
         </MapView>
         
-        {/* alguien pide raite */}
+        {/* Pill badge for raite requests */}
         {friendRaiteRequests.length > 0 && (
-        <TouchableOpacity
-          style={styles.pillBadge}
-          onPress={() => {
-            setSelectedFriendRaite(friendRaiteRequests[0]);
-            setRaiteAlertModalVisible(true);
-          }}
-        >
-          <Ionicons name="car-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
-          <Text style={styles.pillBadgeText}>1 Solicitud de raite</Text>
-        </TouchableOpacity>
-      )}
+          <TouchableOpacity
+            style={styles.pillBadge}
+            onPress={() => {
+              setSelectedFriendRaite(friendRaiteRequests[0]);
+              setRaiteAlertModalVisible(true);
+            }}
+          >
+            <Ionicons name="car-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+            <Text style={styles.pillBadgeText}>1 Solicitud de raite</Text>
+          </TouchableOpacity>
+        )}
 
   
         {/* Loading si está cargando */}
@@ -1511,5 +1692,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-  
+  webContainer: {
+    flex: 1,
+    backgroundColor: '#121212',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  webContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  webTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 20,
+  },
+  webDescription: {
+    fontSize: 16,
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  downloadButton: {
+    backgroundColor: '#FF4081',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
 });

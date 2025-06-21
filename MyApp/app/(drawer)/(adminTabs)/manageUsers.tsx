@@ -18,6 +18,7 @@ import { Ionicons, Feather, MaterialIcons, FontAwesome5, MaterialCommunityIcons 
 import { collection, getDocs, doc, deleteDoc, query, orderBy, where } from 'firebase/firestore';
 import { firestore } from '../../../firebase';
 import { useRouter } from 'expo-router';   // ← añadir
+import MaxWidthContainer from '../../../components/MaxWidthContainer';
 
 //@ts-ignore
 export default function ManagementScreen() {
@@ -563,81 +564,81 @@ export default function ManagementScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
-      
-
-      
-      {/* Fixed height container for category selector */}
-      <View style={styles.categorySelectorContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categorySelectorContent}
-        >
-          {categories.map(category => (
-            <TouchableOpacity
-              key={category.id}
-              style={[
-                styles.categoryButton,
-                activeCategory.id === category.id && styles.categoryButtonActive
-              ]}
-              onPress={() => setActiveCategory(category)}
-            >
-              <View style={styles.categoryIconContainer}>
-                {category.icon}
-              </View>
-              <Text 
+      <MaxWidthContainer style={{maxWidth: 1000}}>  
+        {/* Selector de categorías */}
+        <View style={styles.categorySelectorContainer}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categorySelectorContent}
+          >
+            {categories.map(category => (
+              <TouchableOpacity
+                key={category.id}
                 style={[
-                  styles.categoryButtonText,
-                  activeCategory.id === category.id && styles.categoryButtonTextActive
+                  styles.categoryButton,
+                  activeCategory.id === category.id && styles.categoryButtonActive
                 ]}
+                onPress={() => setActiveCategory(category)}
               >
-                {category.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-      
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#b388ff" />
-          <Text style={styles.loadingText}>Cargando {activeCategory.name.toLowerCase()}...</Text>
+                <View style={styles.categoryIconContainer}>
+                  {category.icon}
+                </View>
+                <Text 
+                  style={[
+                    styles.categoryButtonText,
+                    activeCategory.id === category.id && styles.categoryButtonTextActive
+                  ]}
+                >
+                  {category.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
-      ) : (
-        <FlatList
-          data={filteredItems}
-          renderItem={renderItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContainer}
-          ListHeaderComponent={renderHeader}
-          ListEmptyComponent={renderEmptyList}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#b388ff"
-              colors={["#b388ff"]}
-            />
-          }
-        />
-      )}
-
-      {/* ↓ CAMBIO: lanzar AddMentor si la categoría activa es 'mentors' */}
-      <TouchableOpacity
-        style={styles.floatingButton}
-        onPress={() => {
-          if (activeCategory.id === 'mentors') {
-            router.push({ pathname: './addMentor' });
-          } else {
-            router.push({
-              pathname: './addItem',
-              params: { category: activeCategory.id }
-            });
-          }
-        }}
-      >
-        <Ionicons name="add" size={30} color="#000" />
-      </TouchableOpacity>
+        
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#b388ff" />
+            <Text style={styles.loadingText}>Cargando {activeCategory.name.toLowerCase()}...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredItems}
+            showsHorizontalScrollIndicator={false}
+            renderItem={renderItem}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContainer}
+            ListHeaderComponent={renderHeader}
+            ListEmptyComponent={renderEmptyList}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#b388ff"
+                colors={["#b388ff"]}
+              />
+            }
+          />
+        )}
+        
+        {/* Botón flotante */}
+        <TouchableOpacity
+          style={styles.floatingButton}
+          onPress={() => {
+            if (activeCategory.id === 'mentors') {
+              router.push({ pathname: './addMentor' });
+            } else {
+              router.push({
+                pathname: './addItem',
+                params: { category: activeCategory.id }
+              });
+            }
+          }}
+        >
+          <Ionicons name="add" size={30} color="#000" />
+        </TouchableOpacity>
+      </MaxWidthContainer>
     </SafeAreaView>
   );
 }
