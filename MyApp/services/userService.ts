@@ -13,6 +13,7 @@ import { User } from 'firebase/auth';
 export interface UserProfile {
   uid: string;
   email: string | null;
+  friends?: string[];
   name: string;
   university?: string;
   photo?: string;

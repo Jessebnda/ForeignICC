@@ -13,18 +13,18 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getAuth } from 'firebase/auth';
 import * as ImagePicker from 'expo-image-picker';
-import MaxWidthContainer from '../../../components/MaxWidthContainer';
-import ProfileHeader from '../../../components/profile/ProfileHeader';
-import ProfilePostsGrid from '../../../components/profile/ProfilePostsGrid';
-import ProfileEditForm from '../../../components/profile/ProfileEditForm';
-import { useProfile } from '../../../hooks/useProfile';
-import PostDetailModal from '../../../components/feed/PostDetailModal';
-import { usePosts } from '../../../hooks/usePosts';
-import { useComments } from '../../../hooks/useComments';
-import { Post } from '../../../services/postService';
+import MaxWidthContainer from '../../components/MaxWidthContainer';
+import ProfileHeader from '../../components/profile/ProfileHeader';
+import ProfilePostsGrid from '../../components/profile/ProfilePostsGrid';
+import ProfileEditForm from '../../components/profile/ProfileEditForm';
+import { useProfile } from '../../hooks/useProfile';
+import PostDetailModal from '../../components/feed/PostDetailModal';
+import { usePosts } from '../../hooks/usePosts';
+import { useComments } from '../../hooks/useComments';
+import { Post } from '../../services/postService';
 
 
-export default function ProfileScreen() {
+export default function FriendProfile() {
   const { uid } = useLocalSearchParams();
   const router = useRouter();
   const auth = getAuth();

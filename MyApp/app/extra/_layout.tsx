@@ -27,7 +27,7 @@ export default function ExtraLayout() {
       {/* Asegúrate de que todas las pantallas bajo 'extra' estén definidas aquí */}
       <Stack.Screen name="messages" options={{ title: 'Mensajes' }} />
       <Stack.Screen name="notifications" options={{ title: 'Notificaciones' }} />
-      <Stack.Screen name="perfil" options={{ title: 'Perfil de Amigo' }} />
+      <Stack.Screen name="friendProfile" options={{ title: 'Perfil de Amigo' }} />
       <Stack.Screen name="chat" options={{ title: 'Chat' }} /> 
       <Stack.Screen name="createPost" options={{ title: 'Crear Publicación' }} />
       <Stack.Screen name="editProfile" options={{ title: 'Editar Perfil' }} />

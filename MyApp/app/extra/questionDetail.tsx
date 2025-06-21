@@ -175,7 +175,7 @@ export default function QuestionDetailScreen() {
   // Si necesitas navegar a perfil desde un item:
   const goToUserProfile = (userId: string) => {
     if (userId) {
-      router.push(`/extra/perfil?uid=${userId}`);
+      router.push(`/extra/friendProfile?uid=${userId}`);
     }
   };
 
@@ -213,7 +213,7 @@ export default function QuestionDetailScreen() {
         <View style={styles.cardHeader}>
           <TouchableOpacity 
             style={styles.userInfo}
-            onPress={() => router.push(`/extra/perfil?uid=${question.user?.id}`)}
+            onPress={() => router.push(`/extra/friendProfile?uid=${question.user?.id}`)}
           >
             <Image 
               source={renderAvatar(question.user?.photo)} 
@@ -256,7 +256,7 @@ export default function QuestionDetailScreen() {
               <TouchableOpacity 
                 onPress={(e) => {
                   e.stopPropagation(); // Evitar que se active la navegación a la respuesta
-                  router.push(`/extra/perfil?uid=${item.user?.id}`);
+                  router.push(`/extra/friendProfile?uid=${item.user?.id}`);
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center' }}
               >

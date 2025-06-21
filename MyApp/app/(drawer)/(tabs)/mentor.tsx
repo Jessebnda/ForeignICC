@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import MentorListScreen from '../../extra/mentorList';
-import ChatbotScreen from '../../extra/chatbot';
-import ReceivedChatsScreen from '../../extra/receivedChats';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import MaxWidthContainer from '../../../components/MaxWidthContainer';
+import MentorListScreen from '../../extra/mentorList';
+import ReceivedChatsScreen from '../../extra/receivedChats';
+import ChatbotScreen from '../../extra/chatbot';
 
 export default function MentorScreen() {
   const { userProfile } = useUser();
@@ -20,7 +20,7 @@ export default function MentorScreen() {
   }, [userProfile]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <MaxWidthContainer>
         <View style={styles.tabContainer}>
           <TouchableOpacity
@@ -31,7 +31,12 @@ export default function MentorScreen() {
             ]}
             onPress={() => setActiveTab('mentores')}
           >
-            <Text style={styles.tabText}>Mentores</Text>
+            <Text style={[
+              styles.tabText, 
+              activeTab === 'mentores' && styles.activeTabText
+            ]}>
+              Mentores
+            </Text>
           </TouchableOpacity>
 
           {isMentor && (
@@ -39,7 +44,12 @@ export default function MentorScreen() {
               style={[styles.tab, activeTab === 'recibidos' && styles.activeTab]}
               onPress={() => setActiveTab('recibidos')}
             >
-              <Text style={styles.tabText}>Recibidos</Text>
+              <Text style={[
+                styles.tabText, 
+                activeTab === 'recibidos' && styles.activeTabText
+              ]}>
+                Recibidos
+              </Text>
             </TouchableOpacity>
           )}
 
@@ -51,7 +61,12 @@ export default function MentorScreen() {
             ]}
             onPress={() => setActiveTab('chatbot')}
           >
-            <Text style={styles.tabText}>Chatbot</Text>
+            <Text style={[
+              styles.tabText, 
+              activeTab === 'chatbot' && styles.activeTabText
+            ]}>
+              Chatbot
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -61,7 +76,7 @@ export default function MentorScreen() {
           {activeTab === 'chatbot' && <ChatbotScreen />}
         </View>
       </MaxWidthContainer>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -69,13 +84,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
-    padding: 16,
   },
   tabContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderColor: '#333',
     marginBottom: 12,
+    marginHorizontal: 16,
   },
   tab: {
     flex: 1,
@@ -89,9 +104,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#2c2c2c',
   },
   tabText: {
-    color: '#fff',
+    color: '#aaa',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  activeTabText: {
+    color: '#fff',
   },
   content: {
     flex: 1,
