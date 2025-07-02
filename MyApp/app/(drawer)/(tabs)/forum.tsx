@@ -90,6 +90,7 @@ export default function ForumScreen() {
           >
             <Ionicons name="send" size={20} color={questionText.trim() ? '#fff' : '#888'} />
           </TouchableOpacity>
+          
         </View>
       </MaxWidthContainer>
     </View>

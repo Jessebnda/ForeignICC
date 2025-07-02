@@ -67,7 +67,7 @@ export default function FriendProfile() {
     loading: loadingComments,
     setNewComment,
     handleAddComment
-  } = useComments(selectedPost?.id || null, profile);
+  } = useComments(selectedPost?.id || null, targetUserId);
 
   const handleSelectProfilePhoto = async () => {
     if (!isOwnProfile) return;

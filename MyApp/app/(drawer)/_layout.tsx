@@ -62,18 +62,6 @@ export default function DrawerLayout() {
           })}
           drawerContent={() => <CustomDrawerContent userId={userId} />}
         >
-          {/* ... existing screens ... */}
-          <Drawer.Screen
-            name="messages" // This will look for app/(drawer)/messages.tsx
-            options={{
-              drawerLabel: 'Mensajes',
-              title: 'Mis Mensajes',
-              drawerIcon: ({ size, color }) => (
-                <Ionicons name="chatbubbles-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          {/* ... other existing screens ... */}
         </Drawer>
       )}
     </GestureHandlerRootView>
@@ -118,16 +106,13 @@ function CustomDrawerContent({ userId }: { userId: string }) {
 
   const menuItems: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
     { title: "User", icon: "account", path: '/(tabs)/profile' },
-    { title: "Messages", icon: "message", path: 'extra/messages' }, 
-    { title: "Friend request", icon: "account-plus", path: '/extra/friendRequest' },
-    { title: "Configuración", icon: "cog", path: '/settings' },  // Esta línea debe apuntar a '/settings'
   ];
 
   const menuItemsAdmin: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
     { title: "User", icon: "account", path: '/(tabs)/profile' },
     { title: "Messages", icon: "message", path: '/extra/messages' }, 
     { title: "Friend request", icon: "account-plus", path: '/extra/friendRequest' },
-    { title: "Configuración", icon: "cog", path: '/settings' },  // Esta línea debe apuntar a '/settings'
+    { title: "Settings", icon: "cog", path: '/settings' },  
     { title: "Dashboard", icon: "powershell", path: '/(adminTabs)' },
   ];
 

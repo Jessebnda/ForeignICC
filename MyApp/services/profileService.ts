@@ -206,26 +206,49 @@ export const acceptFriendRequest = async (
   }
 };
 
-// Rechazar solicitud de amistad
-export const rejectFriendRequest = async (
-  currentUserId: string, 
-  requesterId: string
-): Promise<void> => {
+export const getPendingFriendRequests = async (
+  currentUserId: string
+): Promise<UserProfile[]> => {
   try {
-    // Actualizar usuario actual
-    await updateDoc(doc(firestore, 'users', currentUserId), {
-      friendRequests: arrayRemove(requesterId)
-    });
-    
-    // Actualizar solicitante
-    await updateDoc(doc(firestore, 'users', requesterId), {
-      pendingRequests: arrayRemove(currentUserId)
-    });
+    if (!currentUserId) throw new Error('ID de usuario no proporcionado');
+
+    const userDoc = await getDoc(doc(firestore, 'users', currentUserId));
+
+    if (!userDoc.exists()) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    const userData = userDoc.data();
+    const pendingRequests: string[] = userData.pendingRequests || [];
+
+    const profiles: UserProfile[] = [];
+
+    for (const requesterId of pendingRequests) {
+      // Validar que el ID no esté vacío o mal formado
+      if (typeof requesterId !== 'string' || requesterId.trim() === '') {
+        console.warn('ID inválido en pendingRequests:', requesterId);
+        continue;
+      }
+
+      const requesterDoc = await getDoc(doc(firestore, 'users', requesterId));
+
+      if (requesterDoc.exists()) {
+        profiles.push({
+          uid: requesterDoc.id,
+          ...requesterDoc.data()
+        } as UserProfile);
+      } else {
+        console.warn('Usuario no encontrado para ID:', requesterId);
+      }
+    }
+
+    return profiles;
   } catch (error) {
-    console.error('Error rechazando solicitud de amistad:', error);
+    console.error('Error obteniendo solicitudes de amistad pendientes:', error);
     throw error;
   }
 };
+
 
 // Eliminar amigo
 export const removeFriend = async (

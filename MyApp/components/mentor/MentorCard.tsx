@@ -60,11 +60,7 @@ export default function MentorCard({ mentor, onPress }: MentorCardProps) {
       )}
       
       <View style={styles.footer}>
-        <Text style={styles.status}>
-          {mentor.isAvailable 
-            ? 'Disponible ahora' 
-            : 'No disponible'}
-        </Text>
+
         
         <View style={styles.chatButton}>
           <Ionicons name="chatbubble-outline" size={16} color="#fff" />

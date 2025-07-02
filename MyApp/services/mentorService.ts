@@ -28,7 +28,8 @@ export interface Mentor {
   createdAt?: any;
   isAdmin?: boolean;
   isMentor?: boolean;
-  rating?: number; // Calificación del mentor
+  rating?: number; 
+  topics?: string[];
 }
 
 export interface ChatSession {
@@ -74,7 +75,8 @@ export const getMentors = async (): Promise<Mentor[]> => {
       origin: doc.data().origin || '',
       createdAt: doc.data().createdAt || null,
       isAdmin: doc.data().isAdmin || false,
-      isMentor: doc.data().isMentor || false
+      isMentor: doc.data().isMentor || false,
+      topics: doc.data().topics || [],
     }));
   } catch (error) {
     console.error('Error obteniendo mentores:', error);
@@ -103,7 +105,8 @@ export const getMentorsByUniversity = async (university: string): Promise<Mentor
       origin: doc.data().origin || '',
       createdAt: doc.data().createdAt || null,
       isAdmin: doc.data().isAdmin || false,
-      isMentor: doc.data().isMentor || false
+      isMentor: doc.data().isMentor || false,
+      topics: doc.data().topics || [],
     }));
   } catch (error) {
     console.error('Error filtrando mentores:', error);

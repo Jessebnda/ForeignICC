@@ -23,7 +23,6 @@ const POSTS_COLLECTION = 'feedPosts';
 export interface Post {
   id: string;
   image: string;
-  content: string;
   caption?: string;
   createdAt: any;
   userId: string;

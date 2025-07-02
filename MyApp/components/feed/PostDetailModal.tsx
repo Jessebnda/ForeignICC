@@ -48,6 +48,30 @@ export default function PostDetailModal({
 }: PostDetailModalProps) {
   const router = useRouter();
 
+  const getImageSource = (imageData: any, fallbackImage: any = require('../../assets/images/img7.jpg')) => {
+    if (!imageData) {
+      return fallbackImage;
+    }
+    
+    if (typeof imageData === 'string') {
+      return { uri: imageData };
+    }
+    
+    if (typeof imageData === 'object') {
+      if (imageData.uri) {
+        return { uri: imageData.uri };
+      }
+      if (imageData.url) {
+        return { uri: imageData.url };
+      }
+      if (imageData.source) {
+        return { uri: imageData.source };
+      }
+    }
+    
+    return fallbackImage;
+  };
+
   if (!post) return null;
 
   return (
@@ -57,245 +81,376 @@ export default function PostDetailModal({
       visible={isVisible}
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.detailOverlay}
-      >
-        <ScrollView 
-          style={styles.detailScroll}
-          contentContainerStyle={{ paddingBottom: 80 }}
+      <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalContainer}
         >
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close-circle" size={32} color="#aaa" />
-          </TouchableOpacity>
-
-          {/* Author Info */}
-          <TouchableOpacity
-            onPress={() => {
-              onClose(); // Cerrar el modal actual
-              router.push(`/extra/friendProfile?uid=${post.user?.id}`);
-            }}
-            style={styles.authorContainer}
-          >
-            <Image
-              source={
-                post.user?.image || require('../../assets/images/img7.jpg')
-              }
-              style={styles.detailAuthorImage}
-            />
-            <Text style={styles.detailAuthorName}>{post.user?.name || 'Usuario'}</Text>
-          </TouchableOpacity>
-
-          {/* Image */}
-          {post.image && (
-            <Image
-              source={{ uri: post.image }}
-              style={styles.detailImage}
-            />
-          )}
-
-          {/* Delete Button (only for post owner) */}
-          {post.userId === currentUserId && (
-            <View style={{ width: '100%', alignItems: 'flex-end', marginTop: 8 }}>
-              <TouchableOpacity onPress={() => onDeletePost(post.id)}>
-                <Ionicons name="trash-outline" size={24} color="red" />
+          {/* Header con botón de cerrar */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+            {post.userId === currentUserId && (
+              <TouchableOpacity 
+                onPress={() => onDeletePost(post.id)}
+                style={styles.deleteButton}
+              >
+                <Ionicons name="trash-outline" size={24} color="#ff4757" />
               </TouchableOpacity>
-            </View>
-          )}
+            )}
+          </View>
 
-          {/* Content/Caption */}
-          <View style={styles.detailContent}>
-            <Text style={styles.detailCaption}>{post.content || post.caption}</Text>
+          <ScrollView 
+            style={styles.scrollContainer}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Información del autor */}
+            <TouchableOpacity
+              onPress={() => {
+                onClose();
+                router.push(`/extra/friendProfile?uid=${post.user?.id}`);
+              }}
+              style={styles.authorSection}
+            >
+              <Image
+                source={getImageSource(post.user?.image)}
+                style={styles.authorAvatar}
+              />
+              <View style={styles.authorInfo}>
+                <Text style={styles.authorName}>{post.user?.name || 'Usuario'}</Text>
+                <Text style={styles.postTime}>Hace 2 horas</Text>
+              </View>
+            </TouchableOpacity>
 
-            {/* Like Button */}
-            <View style={{ width: '100%', marginTop: 16, alignItems: 'flex-start' }}>
-              <TouchableOpacity onPress={onToggleLike} style={styles.likeButton}>
+            {/* Imagen del post */}
+            {post.image && (
+              <View style={styles.imageContainer}>
+                <Image
+                  source={getImageSource(post.image)}
+                  style={styles.postImage}
+                  resizeMode="cover"
+                />
+              </View>
+            )}
+
+            {/* Acciones (like, comentarios) */}
+            <View style={styles.actionsSection}>
+              <TouchableOpacity onPress={onToggleLike} style={styles.actionButton}>
                 <Ionicons
                   name={isLiked ? "heart" : "heart-outline"}
-                  size={28}
-                  color={isLiked ? "#e91e63" : "#fff"}
+                  size={26}
+                  color={isLiked ? "#ff3742" : "#fff"}
                 />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton}>
+                <Ionicons name="chatbubble-outline" size={24} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton}>
+                <Ionicons name="paper-plane-outline" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.actionText}>{post.likeCount || 0} Me gusta</Text>
-            
-            {/* Comments */}
-            <View style={{ width: '100%', marginTop: 16 }}>
+            {/* Contador de likes */}
+            <View style={styles.likesSection}>
+              <Text style={styles.likesText}>
+                {post.likeCount || 0} {(post.likeCount || 0) === 1 ? 'me gusta' : 'me gusta'}
+              </Text>
+            </View>
+
+            {/* Caption/Contenido */}
+            <View style={styles.captionSection}>
+              <Text style={styles.captionText}>
+                <Text style={styles.captionAuthor}>{post.user?.name || 'Usuario'} </Text>
+                {post.content || post.caption}
+              </Text>
+            </View>
+
+            {/* Sección de comentarios */}
+            <View style={styles.commentsSection}>
+              <Text style={styles.commentsTitle}>Comentarios</Text>
+              
               {loadingComments ? (
-                <ActivityIndicator color="#bb86fc" />
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color="#bb86fc" size="small" />
+                  <Text style={styles.loadingText}>Cargando comentarios...</Text>
+                </View>
               ) : comments.length > 0 ? (
-                comments.map((comment) => (
-                  <View key={comment.id} style={styles.commentCard}>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        onClose(); // Cerrar el modal actual
-                        router.push(`/extra/friendProfile?uid=${comment.user?.id}`);
-                      }}
-                      style={{ flexDirection: 'row', alignItems: 'center' }}
-                    >
-                      <Image
-                        source={
-                          comment.user?.image
-                            ? typeof comment.user.image === 'string'
-                              ? { uri: comment.user.image }
-                              : comment.user.image
-                            : require('../../assets/images/img7.jpg')
-                        }
-                        style={styles.commentUserImage}
-                      />
-                      <Text style={styles.commentUserName}>{comment.user?.name || 'Usuario'}</Text>
-                    </TouchableOpacity>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: '#333' }}>{comment.text}</Text>
+                <View style={styles.commentsList}>
+                  {comments.map((comment) => (
+                    <View key={comment.id} style={styles.commentItem}>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          onClose();
+                          router.push(`/extra/friendProfile?uid=${comment.user?.id}`);
+                        }}
+                        style={styles.commentAuthor}
+                      >
+                        <Image
+                          source={getImageSource(comment.user?.image)}
+                          style={styles.commentAvatar}
+                        />
+                        <View style={styles.commentContent}>
+                          <Text style={styles.commentText}>
+                            <Text style={styles.commentAuthorName}>
+                              {comment.user?.name || 'Usuario'}
+                            </Text>
+                            {' '}{comment.text}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
                     </View>
-                  </View>
-                ))
+                  ))}
+                </View>
               ) : (
-                <Text style={styles.noDataText}>No hay comentarios aún.</Text>
+                <View style={styles.noCommentsContainer}>
+                  <Ionicons name="chatbubbles-outline" size={48} color="#555" />
+                  <Text style={styles.noCommentsText}>Aún no hay comentarios</Text>
+                  <Text style={styles.noCommentsSubtext}>¡Sé el primero en comentar!</Text>
+                </View>
               )}
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
 
-        {/* Comment Input */}
-        <View style={styles.commentInputRow}>
-          <TextInput
-            style={styles.commentInput}
-            placeholder="Añadir un comentario..."
-            placeholderTextColor="#888"
-            value={newComment}
-            onChangeText={setNewComment}
-          />
-          <TouchableOpacity onPress={onAddComment} disabled={!newComment.trim()}>
-            <Ionicons 
-              name="send" 
-              size={24} 
-              color={newComment.trim() ? "#bb86fc" : "#888"} 
+          {/* Input de comentarios */}
+          <View style={styles.commentInputContainer}>
+            <Image
+              source={getImageSource(null)} // Imagen del usuario actual
+              style={styles.inputAvatar}
             />
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Añadir un comentario..."
+              placeholderTextColor="#888"
+              value={newComment}
+              onChangeText={setNewComment}
+              multiline
+              maxLength={500}
+            />
+            <TouchableOpacity 
+              onPress={onAddComment} 
+              disabled={!newComment.trim()}
+              style={[
+                styles.sendButton,
+                { opacity: newComment.trim() ? 1 : 0.5 }
+              ]}
+            >
+              <Ionicons 
+                name="send" 
+                size={20} 
+                color={newComment.trim() ? "#bb86fc" : "#888"} 
+              />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  detailOverlay: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.95)',
-    padding: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
   },
-  detailScroll: {
-    width: Platform.OS === 'web' ? 600 : '100%',
-    maxHeight: '90%',
-    backgroundColor: '#121212',
-    borderRadius: 20,
-    padding: 20,
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    marginTop: Platform.OS === 'ios' ? 50 : 30,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
   },
   closeButton: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 20,
-    right: 15,
-    zIndex: 10,
-  },
-  authorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-  },
-  detailAuthorImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
-    backgroundColor: '#555',
-  },
-  detailAuthorName: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  detailImage: {
-    width: '100%',
-    height: 240,
-    borderRadius: 16,
-    marginBottom: 16,
-  },
-  detailContent: {
-    alignItems: 'center',
-  },
-  detailCaption: {
-    color: '#fff',
-    fontSize: 16,
-    marginBottom: 16,
-    alignSelf: 'flex-start',
-    textAlign: 'left',
-  },
-  likeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  actionText: {
+  deleteButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 71, 87, 0.1)',
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  authorSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  authorAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#333',
+    marginRight: 12,
+  },
+  authorInfo: {
+    flex: 1,
+  },
+  authorName: {
     color: '#fff',
-    marginLeft: 6,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
   },
-  commentInputRow: {
+  postTime: {
+    color: '#888',
+    fontSize: 12,
+  },
+  imageContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 15,
+  },
+  postImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 12,
+    backgroundColor: '#333',
+  },
+  actionsSection: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  actionButton: {
+    marginRight: 15,
+    padding: 5,
+  },
+  likesSection: {
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  likesText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  captionSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  captionText: {
+    color: '#fff',
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  captionAuthor: {
+    fontWeight: '600',
+  },
+  commentsSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  commentsTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 15,
+  },
+  loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
+    paddingVertical: 20,
+  },
+  loadingText: {
+    color: '#888',
+    marginLeft: 10,
+    fontSize: 14,
+  },
+  commentsList: {
+    gap: 12,
+  },
+  commentItem: {
+    marginBottom: 8,
+  },
+  commentAuthor: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  commentAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#333',
+    marginRight: 10,
+  },
+  commentContent: {
+    flex: 1,
+    backgroundColor: '#2a2a2a',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  commentText: {
+    color: '#fff',
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  commentAuthorName: {
+    fontWeight: '600',
+    color: '#bb86fc',
+  },
+  noCommentsContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  noCommentsText: {
+    color: '#888',
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 12,
+  },
+  noCommentsSubtext: {
+    color: '#666',
+    fontSize: 14,
+    marginTop: 4,
+  },
+  commentInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
     borderTopWidth: 1,
     borderTopColor: '#333',
-    backgroundColor: '#121212',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    backgroundColor: '#1a1a1a',
+  },
+  inputAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#333',
+    marginRight: 10,
   },
   commentInput: {
     flex: 1,
     backgroundColor: '#2a2a2a',
     color: '#fff',
     paddingHorizontal: 15,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+    paddingVertical: 10,
     borderRadius: 20,
-    marginRight: 10,
     fontSize: 15,
-    maxWidth: 800,
+    maxHeight: 100,
+    marginRight: 10,
   },
-  commentUserImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  commentUserName: {
-    fontWeight: 'bold',
-    fontSize: 14,
-    color: '#333',
-  },
-  commentCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    backgroundColor: '#bb86fc',
-    borderRadius: 12,
-    padding: 10,
-    gap: 8,
-  },
-  noDataText: {
-    color: '#888',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: 10,
-    width: '100%',
-    paddingHorizontal: 16,
+  sendButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(187, 134, 252, 0.1)',
   },
 });

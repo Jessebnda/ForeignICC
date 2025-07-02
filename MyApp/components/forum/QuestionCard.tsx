@@ -64,9 +64,6 @@ export default function QuestionCard({ question, onPress, onUserPress }: Questio
             {question.answerCount || 0} {question.answerCount === 1 ? 'respuesta' : 'respuestas'}
           </Text>
         </View>
-        <TouchableOpacity style={styles.answerButton}>
-          <Text style={styles.answerButtonText}>Responder</Text>
-        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );

@@ -2,7 +2,8 @@ import {
   doc, 
   getDoc, 
   setDoc, 
-  updateDoc, 
+  updateDoc,
+  deleteField,
   serverTimestamp 
 } from 'firebase/firestore';
 import { firestore } from './firebase/config';
@@ -22,9 +23,10 @@ export interface UserProfile {
   createdAt?: any;
   isAdmin?: boolean;
   isMentor?: boolean;
+  topics?: string[];
 }
 
-// Crear o actualizar un documento de usuario en Firestore
+
 export const createOrUpdateUserProfile = async (
   user: User, 
   profileData?: Partial<UserProfile>
@@ -32,7 +34,9 @@ export const createOrUpdateUserProfile = async (
   try {
     const userRef = doc(firestore, 'users', user.uid);
     const userSnap = await getDoc(userRef);
-    
+
+    const isMentor = profileData?.isMentor ?? false;
+
     if (!userSnap.exists()) {
       // Crear nuevo documento de usuario
       const newUserData: UserProfile = {
@@ -45,22 +49,31 @@ export const createOrUpdateUserProfile = async (
         origin: profileData?.origin || '',
         createdAt: serverTimestamp(),
         isAdmin: false,
-        isMentor: false,
+        isMentor,
+        ...(isMentor && { topics: profileData?.topics ?? [] })
       };
-      
+
       await setDoc(userRef, newUserData);
     } else if (profileData) {
-      // Actualizar documento existente con nuevos datos
-      await updateDoc(userRef, {
+      const updatePayload: any = {
         ...profileData,
-        updatedAt: serverTimestamp()
-      });
+        updatedAt: serverTimestamp(),
+      };
+
+      if (profileData.isMentor === true) {
+        updatePayload.topics = profileData.topics ?? [];
+      } else if (profileData.isMentor === false) {
+        updatePayload.topics = deleteField();
+      }
+
+      await updateDoc(userRef, updatePayload);
     }
   } catch (error) {
     console.error('Error creando/actualizando perfil de usuario:', error);
     throw error;
   }
 };
+
 
 // Obtener perfil de usuario desde Firestore
 export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {

@@ -141,8 +141,8 @@ export default function SettingsScreen() {
           >
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Configuración</Text>
-          <View style={{width: 40}} /> {/* Espacio para equilibrar el header */}
+          <Text style={styles.headerTitle}>Settings</Text>
+          <View style={{width: 40}} /> 
         </View>
         
         <ScrollView 
