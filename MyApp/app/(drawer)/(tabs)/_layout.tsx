@@ -214,7 +214,6 @@ export default function TabLayout() {
   );
 }
 
-// Add these styles if you're using Option 2
 const styles = StyleSheet.create({
   webContainer: {
     flex: 1,

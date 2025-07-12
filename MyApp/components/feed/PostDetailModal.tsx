@@ -163,7 +163,7 @@ export default function PostDetailModal({
             <View style={styles.captionSection}>
               <Text style={styles.captionText}>
                 <Text style={styles.captionAuthor}>{post.user?.name || 'Usuario'} </Text>
-                {post.content || post.caption}
+                {post.caption}
               </Text>
             </View>
 
