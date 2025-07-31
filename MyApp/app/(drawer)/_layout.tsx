@@ -99,20 +99,18 @@ function CustomDrawerContent({ userId }: { userId: string }) {
     }
   };
 
-  const toggleTheme = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setIsDarkMode(previousState => !previousState);
-  };
-
   const menuItems: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
     { title: "User", icon: "account", path: '/(tabs)/profile' },
+    { title: "Messages", icon: "message", path: '/extra/messages' }, 
+    { title: "Friend request", icon: "account-plus", path: '/extra/friendRequest' },
+    { title: "Settings", icon: "cog", path: '/extra/settings' },  
   ];
 
   const menuItemsAdmin: { title: string; icon: keyof typeof MaterialCommunityIcons.glyphMap, path: string }[] = [
     { title: "User", icon: "account", path: '/(tabs)/profile' },
     { title: "Messages", icon: "message", path: '/extra/messages' }, 
     { title: "Friend request", icon: "account-plus", path: '/extra/friendRequest' },
-    { title: "Settings", icon: "cog", path: '/settings' },  
+    { title: "Settings", icon: "cog", path: '/extra/settings' },  
     { title: "Dashboard", icon: "powershell", path: '/(adminTabs)' },
   ];
 

@@ -12,11 +12,11 @@ import {
 import { Ionicons, MaterialIcons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { collection, getDocs } from 'firebase/firestore';
 import { firestore } from '../../../firebase';
-import { useNavigation } from 'expo-router'; // <--- AÑADIDO
+import { useNavigation } from 'expo-router'; 
 import MaxWidthContainer from '../../../components/MaxWidthContainer';
 
 export default function App() {
-  const navigation = useNavigation(); // <--- AÑADIDO
+  const navigation = useNavigation(); 
   const [loading, setLoading] = useState({
     students: true,
     mentors: true,
@@ -38,7 +38,7 @@ export default function App() {
 
   const handleNavigation = (path?: string) => {
     if (path) {
-      navigation.navigate(path as never); // Cast para evitar error de tipo
+      navigation.navigate(path as never); 
     }
   };
 
@@ -57,36 +57,6 @@ export default function App() {
         console.error("Error fetching mentors:", error);
       } finally {
         setLoading(prev => ({ ...prev, mentors: false }));
-      }
-
-      try {
-        const postsCollection = collection(firestore, 'posts');
-        const postsSnapshot = await getDocs(postsCollection);
-        setCounts(prev => ({ ...prev, posts: postsSnapshot.size }));
-      } catch (error) {
-        console.error("Error fetching posts:", error);
-      } finally {
-        setLoading(prev => ({ ...prev, posts: false }));
-      }
-
-      try {
-        const locationsCollection = collection(firestore, 'locations');
-        const locationsSnapshot = await getDocs(locationsCollection);
-        setCounts(prev => ({ ...prev, locations: locationsSnapshot.size }));
-      } catch (error) {
-        console.error("Error fetching locations:", error);
-      } finally {
-        setLoading(prev => ({ ...prev, locations: false }));
-      }
-
-      try {
-        const forumsCollection = collection(firestore, 'forums');
-        const forumsSnapshot = await getDocs(forumsCollection);
-        setCounts(prev => ({ ...prev, forums: forumsSnapshot.size }));
-      } catch (error) {
-        console.error("Error fetching forums:", error);
-      } finally {
-        setLoading(prev => ({ ...prev, forums: false }));
       }
 
     } catch (error) {
@@ -109,7 +79,7 @@ export default function App() {
       count: counts.students,
       loading: loading.students,
       action: 'Ir a la gestión de Estudiantes',
-      path: 'manageUsers' // 🔥 Agregado path
+      path: 'manageUsers' 
     },
     {
       id: 'mentors',
@@ -118,35 +88,8 @@ export default function App() {
       count: counts.mentors,
       loading: loading.mentors,
       action: 'Ir a la gestión de Mentores',
-      path: 'manageMentors' // 🔥 Agregado path
+      path: 'manageMentors' 
     },
-    {
-      id: 'posts',
-      title: 'Posts',
-      icon: <MaterialCommunityIcons name="post-outline" size={28} color="#b388ff" />,
-      count: counts.posts,
-      loading: loading.posts,
-      action: 'Ir a la gestión de Posts',
-      path: 'gestionPosts' // 🔥 Agregado path
-    },
-    {
-      id: 'locations',
-      title: 'Ubicaciones',
-      icon: <MaterialIcons name="location-on" size={28} color="#b388ff" />,
-      count: counts.locations,
-      loading: loading.locations,
-      action: 'Ir a la gestión de Ubicaciones',
-      path: 'gestionUbicaciones' // 🔥 Agregado path
-    },
-    {
-      id: 'forums',
-      title: 'Foros',
-      icon: <MaterialCommunityIcons name="forum-outline" size={28} color="#b388ff" />,
-      count: counts.forums,
-      loading: loading.forums,
-      action: 'Ir a la gestión de Foros',
-      path: 'gestionForos' // 🔥 Agregado path
-    }
   ];
 
   return (

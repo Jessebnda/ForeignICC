@@ -56,7 +56,6 @@ export default function Index() {
       : <Redirect href="./(tabs)/dashboard" />
   }
 
-  // Fallback por seguridad
   return (
     <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
       <ActivityIndicator size="large" color="#4f0b2e" />

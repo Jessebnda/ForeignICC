@@ -3,14 +3,14 @@ import 'dotenv/config';
 export default {
   expo: {
     name: "MyApp",
-    slug: "MyApp",
+    slug: "foreign",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "myapp",
     userInterfaceStyle: "automatic",
     newArchEnabled: true,
-    owner: "foreign-project",
+    owner: "jpdessens",
     splash: {
       image: "./assets/images/splash-icon.png",
       resizeMode: "contain",
@@ -56,7 +56,7 @@ export default {
         origin: false,
       },
       eas: {
-        projectId: "82b7e50c-dca6-4025-988a-090c649ce802",
+        projectId: "7e63cfef-2003-4bc5-b30b-abc44735a8a2",
       },
       firebase: {
         apiKey: process.env.FIREBASE_API_KEY,

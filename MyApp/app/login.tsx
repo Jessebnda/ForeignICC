@@ -22,17 +22,16 @@ import { useAuth } from '../hooks/useAuth';
 import { uploadProfileImage } from '../services/imageService';
 import { UserProfile } from '../services/userService';
 
-// Cierra el flujo OAuth cuando regresas a la app
 WebBrowser.maybeCompleteAuthSession();
 
 // Universidades disponibles
-const UNIVERSITIES = ['CETYS', 'UNAM', 'ITESM', 'UABC', 'IPN', 'Otra'];
+const UNIVERSITIES = ['CETYS'];
 
 // Intereses disponibles
 const INTERESTS = ['deportes', 'gimnasio', 'programación', 'música', 'arte', 'viajes'];
 
 export default function LoginScreen() {
-  const [activeTab, setActiveTab] = useState('login'); // 'login' o 'signup'
+  const [activeTab, setActiveTab] = useState('login'); 
   const [authState, authActions] = useAuth();
   const router = useRouter();
   

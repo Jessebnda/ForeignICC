@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Post } from '../../services/postService';
 import { Comment } from '../../services/commentService';
 import { useRouter } from 'expo-router';
+import { getAuth } from 'firebase/auth';
 
 interface PostDetailModalProps {
   post: Post | null;
@@ -46,7 +47,9 @@ export default function PostDetailModal({
   loadingComments,
   currentUserId
 }: PostDetailModalProps) {
+  const auth = getAuth();
   const router = useRouter();
+  const currentUser = auth.currentUser;
 
   const getImageSource = (imageData: any, fallbackImage: any = require('../../assets/images/img7.jpg')) => {
     if (!imageData) {
@@ -73,6 +76,37 @@ export default function PostDetailModal({
   };
 
   if (!post) return null;
+
+  
+// Función inline en tu componente
+const formatPostTime = (timestamp: any) => {
+  if (!timestamp) return 'Fecha no disponible';
+  
+  try {
+    // Convertir timestamp de Firestore a Date
+    const date = timestamp.seconds 
+      ? new Date(timestamp.seconds * 1000)
+      : new Date(timestamp);
+    
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+    
+    if (diffInMinutes < 1) return 'Ahora';
+    if (diffInMinutes < 60) return `${diffInMinutes}m`;
+    if (diffInHours < 24) return `${diffInHours}h`;
+    if (diffInDays < 7) return `${diffInDays}d`;
+    
+    return date.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'short'
+    });
+  } catch (error) {
+    return 'Error en fecha';
+  }
+};
 
   return (
     <Modal
@@ -115,12 +149,12 @@ export default function PostDetailModal({
               style={styles.authorSection}
             >
               <Image
-                source={getImageSource(post.user?.image)}
+                source={getImageSource(post.userPhoto)}
                 style={styles.authorAvatar}
               />
               <View style={styles.authorInfo}>
-                <Text style={styles.authorName}>{post.user?.name || 'Usuario'}</Text>
-                <Text style={styles.postTime}>Hace 2 horas</Text>
+                <Text style={styles.authorName}>{post.userName || 'Usuario'}</Text>
+                <Text style={styles.postTime}>{formatPostTime(post.createdAt)||'error' }</Text>
               </View>
             </TouchableOpacity>
 
@@ -162,7 +196,7 @@ export default function PostDetailModal({
             {/* Caption/Contenido */}
             <View style={styles.captionSection}>
               <Text style={styles.captionText}>
-                <Text style={styles.captionAuthor}>{post.user?.name || 'Usuario'} </Text>
+                <Text style={styles.captionAuthor}>{post.userName || 'Usuario'} </Text>
                 {post.caption}
               </Text>
             </View>
@@ -215,10 +249,6 @@ export default function PostDetailModal({
 
           {/* Input de comentarios */}
           <View style={styles.commentInputContainer}>
-            <Image
-              source={getImageSource(null)} // Imagen del usuario actual
-              style={styles.inputAvatar}
-            />
             <TextInput
               style={styles.commentInput}
               placeholder="Añadir un comentario..."

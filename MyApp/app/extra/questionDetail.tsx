@@ -270,12 +270,8 @@ export default function QuestionDetailScreen() {
             <Text style={styles.answerText}>{item.content}</Text>
             <View style={styles.answerFooter}>
               <View style={styles.statContainer}>
-                <Ionicons name="heart-outline" size={18} color="#888" />
-                <Text style={styles.statText}>{item.likes || 0}</Text>
               </View>
               <View style={styles.statContainer}>
-                <Ionicons name="chatbubble-outline" size={18} color="#888" />
-                <Text style={styles.statText}>{item.commentCount || 0}</Text>
                 <Text style={styles.commentAction}>Ver comentarios</Text>
               </View>
             </View>

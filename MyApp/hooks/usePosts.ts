@@ -74,7 +74,6 @@ export function usePosts(currentUser: any) {
         currentUser
       );
       
-      // Actualizar UI localmente
       setIsLiked(!isLiked);
       
       // Actualizar conteo de likes en UI

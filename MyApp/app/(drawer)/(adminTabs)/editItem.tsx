@@ -6,7 +6,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 
 export default function EditItem() {
   const params = useLocalSearchParams();
-  // Garantizar que los parámetros sean strings
   const itemId = typeof params.itemId === 'string' ? params.itemId : '';
   const category = typeof params.category === 'string' ? params.category : '';
   
@@ -51,7 +50,6 @@ export default function EditItem() {
       <Text style={styles.label}>Nombre</Text>
       <TextInput style={styles.input} value={name} onChangeText={setName} />
 
-      {/* Solo para mentores */}
       {category === 'mentors' && (
         <>
           <Text style={styles.label}>Áreas (coma separadas)</Text>

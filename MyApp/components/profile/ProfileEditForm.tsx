@@ -13,7 +13,7 @@ import { Picker } from '@react-native-picker/picker';
 import { UserProfile } from '../../services/userService';
 
 // Universidades disponibles
-const UNIVERSITIES = ['CETYS', 'UNAM', 'ITESM', 'UABC', 'IPN', 'Otra'];
+const UNIVERSITIES = ['CETYS'];
 
 // Intereses disponibles
 const INTERESTS = ['deportes', 'gimnasio', 'programación', 'música', 'arte', 'viajes'];

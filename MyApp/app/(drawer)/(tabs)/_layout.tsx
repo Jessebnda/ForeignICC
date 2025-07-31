@@ -20,7 +20,6 @@ export default function TabLayout() {
   const { hasActiveRaiteRequest } = useRaite();
   const { notifications } = useNotifications();
   
-  // Verificar si hay solicitudes de raite no leídas
   const hasUnreadRaiteRequests = notifications.some(
     notif => notif.type === 'raite_request' && !notif.read
   );
@@ -35,7 +34,6 @@ export default function TabLayout() {
     const currentUser = auth.currentUser;
     if (!currentUser || currentUser.isAnonymous) return;
 
-    // Listener para mensajes no leídos
     const messagesRef = ref(database, 'messages');
     const unsubscribeMessages = onValue(messagesRef, async (snapshot) => {
       if (!snapshot.exists()) {

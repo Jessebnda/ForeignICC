@@ -9,7 +9,6 @@ import { useNotifications } from '../../context/NotificationContext';
 import * as Haptics from 'expo-haptics';
 import MaxWidthContainer from '../../components/MaxWidthContainer';
 
-// Define los tipos de notificación para TypeScript
 interface MessageNotification {
   chatId: string;
   userId: string;
@@ -315,7 +314,6 @@ export default function NotificationsScreen() {
     <View style={styles.container}>
       <MaxWidthContainer style={{maxWidth: 800}}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Notificaciones</Text>
           {hasUnread && (
             <TouchableOpacity 
               style={styles.markAllButton}
@@ -365,9 +363,7 @@ export default function NotificationsScreen() {
               <View style={styles.notificationContent}>
                 {renderNotificationTitle(item)}
                 {renderNotificationContent(item)}
-                <Text style={styles.notificationTime}>
-                  {new Date(item.timestamp).toLocaleString()}
-                </Text>
+                
               </View>
               
               {(item.type === 'message' || !item.read) && (

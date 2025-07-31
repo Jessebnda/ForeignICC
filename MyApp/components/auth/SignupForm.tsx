@@ -74,7 +74,6 @@ export default function SignupForm({
       return;
     }
     
-    // Crear objeto de perfil
     const profileData: Partial<UserProfile> = {
       name,
       origin,
@@ -83,7 +82,6 @@ export default function SignupForm({
       photo: profileImageUri || undefined
     };
     
-    // Llamar a la función de registro
     await onSignup(email, password, profileData);
   };
   
@@ -200,12 +198,6 @@ export default function SignupForm({
             <Text style={styles.buttonText}>Crear Cuenta</Text>
           </TouchableOpacity>
           
-          {googleEnabled && (
-            <TouchableOpacity style={styles.googleButton} onPress={onGoogleSignup}>
-              <Ionicons name="logo-google" size={20} color="#fff" style={styles.buttonIcon} />
-              <Text style={styles.buttonText}>Registrarse con Google</Text>
-            </TouchableOpacity>
-          )}
         </>
       )}
     </ScrollView>

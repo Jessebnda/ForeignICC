@@ -17,12 +17,11 @@ import {
 import { Ionicons, Feather, MaterialIcons, FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
 import { collection, getDocs, doc, deleteDoc, query, orderBy, where } from 'firebase/firestore';
 import { firestore } from '../../../firebase';
-import { useRouter } from 'expo-router';   // ← añadir
+import { useRouter } from 'expo-router';   
 import MaxWidthContainer from '../../../components/MaxWidthContainer';
 
-//@ts-ignore
 export default function ManagementScreen() {
-  const router = useRouter();               // ← reemplaza navigation
+  const router = useRouter();               
 
   interface User {
     id: string;
@@ -37,7 +36,7 @@ export default function ManagementScreen() {
     name?: string;
     photoURL?: string;
     specialty?: string;
-    areas?: string[];     // ← añadido
+    areas?: string[];     
   }
 
   interface Post {
@@ -79,7 +78,6 @@ export default function ManagementScreen() {
 
   type DataItem = User | Mentor | Post | Location | Forum;
 
-  // Category configuration (solo una declaración)
   const categories = [
     { id: 'users',    name: 'Estudiantes', collection: 'users',    icon: <Ionicons name="person-outline" size={24} color="#b388ff" /> },
     { id: 'mentors',  name: 'Mentores',    collection: 'users',    icon: <FontAwesome5 name="chalkboard-teacher" size={22} color="#b388ff" /> },  // ← aquí
@@ -95,7 +93,7 @@ export default function ManagementScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [sortBy, setSortBy] = useState('name'); // Default sort field
+  const [sortBy, setSortBy] = useState('name'); 
 
   useEffect(() => {
     fetchItems();
@@ -107,7 +105,6 @@ export default function ManagementScreen() {
     } else {
       const lowercasedQuery = searchQuery.toLowerCase();
       const filtered = items.filter(item => {
-        // Different search fields based on category
         switch(activeCategory.id) {
           case 'users':
             return (item as User).name?.toLowerCase().includes(lowercasedQuery) || 
@@ -167,7 +164,6 @@ export default function ManagementScreen() {
   };
 
   const getSortFieldForCategory = () => {
-    // Return appropriate default sort field based on category
     switch(activeCategory.id) {
       case 'users':
         return sortBy === 'createdAt' ? 'createdAt' : (sortBy === 'email' ? 'email' : 'name');
@@ -201,7 +197,6 @@ export default function ManagementScreen() {
         onPress: async () => {
           try {
             await deleteDoc(doc(firestore, activeCategory.collection, itemId));
-            // Remove item from state
             const updatedItems = items.filter(item => item.id !== itemId);
             setItems(updatedItems);
             setFilteredItems(updatedItems);
@@ -224,7 +219,6 @@ export default function ManagementScreen() {
   const toggleSortOrder = () => {
     const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
     setSortOrder(newOrder);
-    // Re-fetch with new sort order
     fetchItems();
   };
 
@@ -276,7 +270,6 @@ export default function ManagementScreen() {
   };
 
   const renderItem = ({ item }: { item: DataItem }) => {
-    // Render different item layouts based on category
     switch(activeCategory.id) {
       case 'users':
         return renderUserItem(item as User);

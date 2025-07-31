@@ -29,9 +29,33 @@ export default function FriendProfile() {
   const router = useRouter();
   const auth = getAuth();
   const currentUserId = auth.currentUser?.uid || null;
+
   
-  // Si no hay uid en params, usar el currentUserId
-  const targetUserId = uid ? String(uid) : currentUserId || '';
+  // Mejorar el manejo del targetUserId
+  const getTargetUserId = () => {
+    if (uid) {
+      // uid puede ser string o array, manejar ambos casos
+      const userId = Array.isArray(uid) ? uid[0] : uid;
+      return String(userId).trim();
+    }
+    return currentUserId || '';
+  };
+  
+  const targetUserId = getTargetUserId();
+  
+  // Validar que tenemos un userId válido
+  if (!targetUserId) {
+    console.error('No se pudo obtener un userId válido');
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error: No se pudo cargar el perfil</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+  
+  console.log('targetUserId final:', targetUserId);
   
   const {
     profile,
@@ -94,7 +118,7 @@ export default function FriendProfile() {
   };
   
   const handleViewPost = (post: Post) => {
-  setSelectedPost(post as Post);
+    setSelectedPost(post as Post);
   };
   
   // Función para cerrar el modal
@@ -192,6 +216,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 12,
     fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#ff6b6b',
+    fontSize: 16,
+    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 20,

@@ -28,13 +28,13 @@ export interface Post {
   userId: string;
   user?: {
     id: string;
-    name: string;
-    image: any;
     university?: string;
   };
   likes?: { [userId: string]: boolean };
   likeCount?: number;
   comments?: any[];
+  userName?: string;
+  userPhoto?: string;
 }
 
 export interface PostInput {
@@ -60,45 +60,72 @@ export const getAllPosts = async (): Promise<Post[]> => {
 };
 
 // Obtener publicaciones con datos de usuario
-export const getPostsWithUserData = async (): Promise<Post[]> => {
+export const getPostsWithUserData = async (): Promise<any[]> => {
   try {
     const posts = await getAllPosts();
     
-    const postsWithUserData = await Promise.all(posts.map(async (post) => {
-      if (!post.userId) return post;
-      
-      try {
-        const userDoc = await getDoc(doc(firestore, 'users', post.userId));
-        
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          
-          return {
-            ...post,
-            user: {
-              id: post.userId,
-              name: userData.name || 'Usuario sin nombre',
-              image: userData.photo 
-                ? (typeof userData.photo === 'string' 
-                  ? { uri: userData.photo } 
-                  : userData.photo)
-                : require('../assets/images/img7.jpg'),
-              university: userData.university
-            },
-            likes: post.likes || {},
-            likeCount: post.likes ? Object.keys(post.likes).length : 0
-          };
-        }
-      } catch (error) {
-        console.error(`Error getting user data for post ${post.id}:`, error);
+    // Obtener todos los userIds únicos
+    const uniqueUserIds = [...new Set(posts.map(post => post.userId).filter(Boolean))];
+    
+    // Si no hay userIds, retornar posts como están
+    if (uniqueUserIds.length === 0) {
+      return posts.map(post => ({
+        ...post,
+        likes: post.likes || {},
+        likeCount: post.likes ? Object.keys(post.likes).length : 0
+      }));
+    }
+    
+    // Obtener todos los usuarios en una sola consulta batch
+    const userPromises = uniqueUserIds.map(userId => 
+      getDoc(doc(firestore, 'users', userId))
+    );
+    
+    const userDocs = await Promise.all(userPromises);
+    
+    // Crear un mapa de usuarios para acceso rápido
+    const usersMap = new Map();
+    userDocs.forEach((userDoc, index) => {
+      if (userDoc.exists()) {
+        usersMap.set(uniqueUserIds[index], userDoc.data());
+      }
+    });
+    
+    // Mapear posts con datos de usuario
+    const postsWithUserData = posts.map(post => {
+      if (!post.userId) {
+        return {
+          ...post,
+          likes: post.likes || {},
+          likeCount: post.likes ? Object.keys(post.likes).length : 0
+        };
       }
       
-      return post;
-    }));
+      const userData = usersMap.get(post.userId);
+      
+      return {
+        ...post,
+        user: {
+          id: post.userId,
+          name: userData?.name || post.userName || 'Usuario sin nombre',
+          image: userData?.photo 
+            ? (typeof userData.photo === 'string'
+              ? { uri: userData.photo }
+              : userData.photo)
+            : (post.userPhoto 
+              ? { uri: post.userPhoto }
+              : require('../assets/images/img7.jpg')),
+          university: userData?.university || null
+        },
+        likes: post.likes || {},
+        createdAt: post.createdAt || firestoreTimestamp(),
+        likeCount: post.likes ? Object.keys(post.likes).length : 0
+      };
+    });
     
     return postsWithUserData;
   } catch (error) {
-    console.error('Error getting posts with user data:', error);
+    console.error('Error in getPostsWithUserDataEfficient:', error);
     throw error;
   }
 };

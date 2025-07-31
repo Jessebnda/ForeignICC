@@ -69,19 +69,7 @@ export default function LoginForm({
         <>
           <TouchableOpacity style={styles.primaryButton} onPress={handleLogin}>
             <Text style={styles.buttonText}>Iniciar Sesión</Text>
-          </TouchableOpacity>
-          
-          {googleEnabled && (
-            <TouchableOpacity style={styles.googleButton} onPress={onGoogleLogin}>
-              <Ionicons name="logo-google" size={20} color="#fff" style={styles.buttonIcon} />
-              <Text style={styles.buttonText}>Continuar con Google</Text>
-            </TouchableOpacity>
-          )}
-          
-          <TouchableOpacity style={styles.secondaryButton} onPress={onAnonymousLogin}>
-            <Ionicons name="person-outline" size={20} color="#fff" style={styles.buttonIcon} />
-            <Text style={styles.buttonText}>Entrar como Invitado</Text>
-          </TouchableOpacity>
+          </TouchableOpacity>     
         </>
       )}
     </View>
@@ -116,15 +104,6 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: '#bb86fc',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  googleButton: {
-    backgroundColor: '#4285F4',
-    flexDirection: 'row',
-    justifyContent: 'center',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',

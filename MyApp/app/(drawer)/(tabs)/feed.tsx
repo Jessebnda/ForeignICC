@@ -31,7 +31,6 @@ export default function FeedScreen() {
   const [currentUserId, setCurrentUserId] = useState('');
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
-  // Custom hooks para posts y comentarios
   const {
     universityPosts,
     friendPosts,
@@ -53,7 +52,6 @@ export default function FeedScreen() {
     handleAddComment
   } = useComments(selectedPost?.id || null, currentUserData);
 
-  // Cargar datos del usuario actual
   useEffect(() => {
     const fetchCurrentUserData = async () => {
       const user = getAuth().currentUser;
@@ -72,7 +70,6 @@ export default function FeedScreen() {
     fetchCurrentUserData();
   }, []);
 
-  // Manejar teclado
   useEffect(() => {
     const Keyboard = require('react-native').Keyboard;
     const showSub = Keyboard.addListener('keyboardDidShow', () => setIsKeyboardVisible(true));
@@ -84,7 +81,6 @@ export default function FeedScreen() {
     };
   }, []);
 
-  // Cargar posts cuando el componente obtiene foco
   useFocusEffect(
     useCallback(() => {
       if (currentUserData) {
@@ -93,7 +89,6 @@ export default function FeedScreen() {
     }, [currentUserData, fetchPosts])
   );
 
-  // Ir al detalle del post
   const goToPostDetail = (post: Post) => {
     setSelectedPost(post);
   };
@@ -154,7 +149,6 @@ export default function FeedScreen() {
           }
         />
   
-        {/* Post Detail Modal */}
         <PostDetailModal
           post={selectedPost}
           isVisible={!!selectedPost}
@@ -170,7 +164,6 @@ export default function FeedScreen() {
           currentUserId={currentUserId}
         />
   
-        {/* FAB para crear post */}
         {!isKeyboardVisible && (
           <TouchableOpacity style={styles.fab} onPress={goToCreatePost}>
             <Text style={styles.fabText}>＋</Text>

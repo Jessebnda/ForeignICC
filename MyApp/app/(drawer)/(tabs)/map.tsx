@@ -1277,7 +1277,6 @@ export default function MapScreen() {
     </SafeAreaView>
   );
 }
-// Estilos mejorados para MapScreen.tsx
 const styles = StyleSheet.create({
   // Contenedores principales
   container: { 

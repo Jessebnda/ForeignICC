@@ -16,10 +16,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getAuth, deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { doc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
-import { firestore } from '../../../firebase'; // Ya no necesitamos database
+import { firestore } from '../../firebase'; // Ya no necesitamos database
 import * as Haptics from 'expo-haptics';
 import { TextInput } from 'react-native-gesture-handler';
-import MaxWidthContainer from '../../../components/MaxWidthContainer';
+import MaxWidthContainer from '../../components/MaxWidthContainer';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -102,14 +102,11 @@ export default function SettingsScreen() {
     setDeleteError('');
     
     try {
-      // Reautenticar al usuario
       const credential = EmailAuthProvider.credential(user.email, password);
       await reauthenticateWithCredential(user, credential);
       
-      // Eliminar datos de Firestore
       await deleteDoc(doc(firestore, 'users', user.uid));
       
-      // Eliminar cuenta de autenticación
       await deleteUser(user);
       
       setDeleteModalVisible(false);
@@ -134,24 +131,12 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <MaxWidthContainer>
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Settings</Text>
-          <View style={{width: 40}} /> 
-        </View>
-        
+     
         <ScrollView 
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
         >
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Privacidad</Text>
-            
+          <View style={styles.section}>            
             {/* Eliminada la opción de ubicación */}
             
             <View style={styles.settingItem}>
